@@ -26,21 +26,11 @@ public class Run1 {
         Path testingDataPath = Paths.get("resources/testing/");
         VFSGroupDataset<FImage> trainingData = new VFSGroupDataset<>(trainingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
         VFSListDataset<FImage> testingData = new VFSListDataset<>(testingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
-        Integer k =20; //current optimum.
+        Integer k = 21; //current optimum.
 
-        Map<Integer,Double> results = new HashMap<>();
-        for(int i =1; i <= 20; i++ ){
-            runAlgorithm(trainingData,testingData, i*10);
-            Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run1.txt"));
-            results.put(i*10, accuracy);
-            System.out.println("Fininshed k=" + i*10 +"Accuracy= " + accuracy);
-        }
-
-        for(Map.Entry<Integer,Double> entry : results.entrySet()){
-            System.out.println("K Value: " + entry.getKey() +"\tAccuracy: " +entry.getValue());
-        }
-
-        System.out.println();
+        runAlgorithm(trainingData,testingData, k);
+        Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run1.txt"));
+        System.out.println("Accuracy= " + accuracy);
     }
 
     /**
