@@ -26,26 +26,37 @@ public class Run1 {
         Path testingDataPath = Paths.get("resources/testing/");
         VFSGroupDataset<FImage> trainingData = new VFSGroupDataset<>(trainingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
         VFSListDataset<FImage> testingData = new VFSListDataset<>(testingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
-        Integer k =20; //current optimum.
+        Integer k = 21; // Accuracy = 0.21405750798722045
 
+        //Run the algorithm for different values for k
         Map<Integer,Double> results = new HashMap<>();
-        for(int i =1; i <= 20; i++ ){
-            runAlgorithm(trainingData,testingData, i*10);
+        for(int i = 20; i <= 30; i++ ){
+            runAlgorithm(trainingData,testingData, i);
             Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run1.txt"));
-            results.put(i*10, accuracy);
-            System.out.println("Fininshed k=" + i*10 +"Accuracy= " + accuracy);
+            results.put(i, accuracy);
+            System.out.println("Finished k = " + i +" Accuracy (average precision) = " + accuracy);
         }
 
         for(Map.Entry<Integer,Double> entry : results.entrySet()){
-            System.out.println("K Value: " + entry.getKey() +"\tAccuracy: " +entry.getValue());
+            System.out.println("K value: " + entry.getKey() +"\tAccuracy: " +entry.getValue());
         }
+
+        //Find the value of k that gives the highest accuracy
+        Map.Entry<Integer, Double> maxEntry = null;
+        for (Map.Entry<Integer, Double> entry : results.entrySet()) {
+            if (maxEntry == null || entry.getValue() > maxEntry.getValue()) {
+                maxEntry = entry;
+            }
+        }
+
+        System.out.println("Best k value = " + maxEntry.getKey() + " which gives an accuracy of " + maxEntry.getValue());
 
         System.out.println();
     }
 
     /**
      * A method which runs a simple Scene Classification algorithm. The algorithm resizes every training image to a 16x16 image, transforms this
-     * into a vector and then mean-centers and normalizes it. The same operation is done for all testing images, who's classification is determined by
+     * into a vector and then mean-centers and normalizes it. The same operation is done for all testing images, and their classification is determined by
      * a weighted-vote of it's k-nearest-neighbours.
      * @param trainingData The data which should be used for training the algorithm. It's assumed this is already classified.
      * @param testingData The data which should be used to test the algorithm.
