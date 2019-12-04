@@ -72,7 +72,7 @@ public class Run1 {
             Map<String, Double> voteMap = new HashMap<>();
             List<IntDoublePair> neighbours = knn.searchKNN(testVector, k);
 
-            //Iterate over evey neighbour and add its vote to the VoteMap. An inverse distance function is used as the weight function.
+            //Iterate over every neighbour and add its vote to the VoteMap. An inverse distance function is used as the weight function.
             for(IntDoublePair indexAndDistance : neighbours){
                 String neighbourClassification = vectorMap.get(vectors[indexAndDistance.first]);
                 Double weightedVote = 1 / indexAndDistance.second;
