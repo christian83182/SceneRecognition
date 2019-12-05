@@ -1,5 +1,6 @@
 package uk.ac.soton.ecs;
 
+import ch.akuhn.matrix.Vector;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.image.FImage;
@@ -15,6 +16,7 @@ import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Run2 {
@@ -81,5 +83,32 @@ public class Run2 {
         }
 
         return patches;
+    }
+
+    private static double[] flattenAndAdjust(float[][] patch){
+
+        double flat[] = new double[patch.length * patch[0].length];
+        int idx = 0;
+
+        for (int i = 0; i < patch.length; i++){
+            
+            for (int j = 0; j < patch.length; j++){
+                flat[idx++] = patch[i][j];
+            }
+        }
+
+        return centerAndNormalize(flat);
+    }
+
+    /**
+     * A static method which mean-centers and normalizes a vector.
+     * @param vectorArray The vector array to be mean-centered and normalized
+     * @return The resultant n-dimensional vector in the form of a double[].
+     */
+    private static double[] centerAndNormalize(double[] vectorArray){
+        Vector vector = Vector.wrap(vectorArray);
+        vector.applyCentering();
+        vector.times(1/vector.norm());
+        return vector.unwrap();
     }
 }
