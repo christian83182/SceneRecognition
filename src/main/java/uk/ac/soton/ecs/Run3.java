@@ -11,8 +11,22 @@ import org.datavec.api.writable.Writable;
 import org.datavec.image.loader.NativeImageLoader;
 import org.datavec.image.recordreader.ImageRecordReader;
 import org.deeplearning4j.datasets.datavec.RecordReaderDataSetIterator;
+import org.deeplearning4j.nn.api.OptimizationAlgorithm;
+import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
+import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
+import org.deeplearning4j.nn.conf.inputs.InputType;
+import org.deeplearning4j.nn.conf.layers.DenseLayer;
+import org.deeplearning4j.nn.conf.layers.OutputLayer;
+import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
+import org.deeplearning4j.nn.weights.WeightInit;
+import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
+import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
+import org.nd4j.linalg.dataset.api.preprocessor.DataNormalization;
+import org.nd4j.linalg.dataset.api.preprocessor.ImagePreProcessingScaler;
+import org.nd4j.linalg.learning.config.Nesterovs;
+import org.nd4j.linalg.lossfunctions.LossFunctions;
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.DoubleFVComparison;
 import org.openimaj.image.FImage;
@@ -36,10 +50,12 @@ public class Run3 {
     private static int height = 256;
     private static int width = 256;
     private static int channels = 1;
-    private static int batchSize = 15;
+    private static int batchSize = 128;
     private static int outputNum = 15;
     private static int epochs = 50;
-    private static Random random = new Random(2019);
+
+    private static final int randomSeed = 2019;
+    private static Random random = new Random(randomSeed);
 
     public static void main(String[] args) throws IOException {
         Run3 run3 = new Run3();
@@ -52,30 +68,65 @@ public class Run3 {
 
         //Define some FileSplits which will randomize the order of data as it's fed into the CNN.
         FileSplit trainingFileSplit = new FileSplit(trainingData, NativeImageLoader.ALLOWED_FORMATS, random);
-        FileSplit testingFileSplit = new FileSplit(testingData, NativeImageLoader.ALLOWED_FORMATS, random);
 
         //A class which labels data according to its folder structure.
         ParentPathLabelGenerator trainingLabelMaker = new ParentPathLabelGenerator();
 
-        //A custom class which labels testing data according to the labels in correct.txt.
-        FileLabelGenerator testingLabelMaker = new FileLabelGenerator();
-
         //A class which will read images from the given FileSplits.
         ImageRecordReader trainingRecordReader = new ImageRecordReader(height, width, channels, trainingLabelMaker);
-        ImageRecordReader testingRecordReader = new ImageRecordReader(height, width, channels, testingLabelMaker);
         trainingRecordReader.initialize(trainingFileSplit);
-        testingRecordReader.initialize(testingFileSplit);
 
-        //Create an iterator to iterate over the images in the training dataset.
+        //Create an iterator to iterate over the images in the training and testing dataset.
         DataSetIterator trainingIterator = new RecordReaderDataSetIterator(trainingRecordReader, batchSize, 1, outputNum);
 
-        //Run one batch and output the results in order to verify the labeler is working correctly.
-        trainingRecordReader.setListeners(new LogRecordListener());
-        for(int i =0; i < 1; i++){
-            DataSet dataSet = trainingIterator.next();
-            System.out.println(dataSet);
-            System.out.println(trainingIterator.getLabels());
+        //Create and add an image preprocessor which normalizes the value of the pixels to values between 0 and 1.
+        DataNormalization normalizer = new ImagePreProcessingScaler(0,1);
+        normalizer.fit(trainingIterator);
+        trainingIterator.setPreProcessor(normalizer);
+
+        logger.info("--- BUILDING MODEL ---");
+        MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
+                .seed(randomSeed)
+                .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
+                .updater(new Nesterovs(0.006, 0.9))
+                .l2(1e-4)
+                .list()
+                .layer(0, new DenseLayer.Builder()
+                        .nIn(height * width)
+                        .nOut(100)
+                        .activation(Activation.RELU)
+                        .weightInit(WeightInit.XAVIER)
+                        .build())
+                .layer(1, new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
+                        .nIn(100)
+                        .nOut(outputNum)
+                        .activation(Activation.SOFTMAX)
+                        .weightInit(WeightInit.XAVIER)
+                        .build())
+                .setInputType(InputType.convolutional(height, width, channels))
+                .build();
+
+        MultiLayerNetwork model = new MultiLayerNetwork(conf);
+
+        model.setListeners(new ScoreIterationListener(10));
+
+        logger.info("--- TRAINING MODEL ---");
+        for (int i = 0; i < epochs; i++) {
+            model.fit(trainingIterator);
+            System.out.println("Epoch " + i +" Complete");
         }
+
+        logger.info("--- EVALUATING MODEL (WIP) ---");
+
+        //Following similar steps to creating a DataSetIterator for the training data.
+        //In this case, a custom FileLabelGenerator class is used which labels testing data according to correct.txt
+        FileSplit testingFileSplit = new FileSplit(testingData, NativeImageLoader.ALLOWED_FORMATS, random);
+        FileLabelGenerator testingLabelMaker = new FileLabelGenerator();
+        ImageRecordReader testingRecordReader = new ImageRecordReader(height, width, channels, testingLabelMaker);
+        testingRecordReader.initialize(testingFileSplit);
+        DataSetIterator testingIterator = new RecordReaderDataSetIterator(testingRecordReader, batchSize, 1, outputNum);
+        normalizer.fit(testingIterator);
+        testingIterator.setPreProcessor(normalizer);
     }
 
     private static boolean isSameImage(FImage firstImage, FImage secondImage){
