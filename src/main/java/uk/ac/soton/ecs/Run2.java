@@ -4,8 +4,11 @@ import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
+import org.openimaj.image.MBFImage;
 import org.openimaj.image.pixel.sampling.RectangleSampler;
+import org.openimaj.image.pixel.statistics.HistogramModel;
 import org.openimaj.math.geometry.shape.Rectangle;
+import org.openimaj.math.statistics.distribution.MultidimensionalHistogram;
 import org.openimaj.ml.clustering.kmeans.FloatKMeans;
 
 import java.io.File;
@@ -37,7 +40,16 @@ public class Run2 {
 
         //LiblinearAnnotator lla = new LiblinearAnnotator(, LiblinearAnnotator.Mode.MULTICLASS, SolverType.L1R_LR,
         //        1.0, 0.0, 1.0, true);
-
+        
+        
+        MBFImage image = null;
+        HistogramModel model = new HistogramModel( 4, 4, 4 );
+        model.estimateModel( image );
+        
+        MultidimensionalHistogram histogram = model.histogram;
+        
+        
+        
         // Patch sampling with Rectangles???
         RectangleSampler sampler = null;
         for(FImage img : trainingData){
