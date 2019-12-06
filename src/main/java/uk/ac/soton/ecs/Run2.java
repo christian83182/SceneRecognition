@@ -1,10 +1,12 @@
 package uk.ac.soton.ecs;
 
 import ch.akuhn.matrix.Vector;
+import org.apache.avro.generic.GenericData;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
+import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
 import org.openimaj.image.pixel.sampling.RectangleSampler;
 import org.openimaj.math.geometry.shape.Rectangle;
 import org.openimaj.ml.clustering.kmeans.FloatKMeans;
@@ -34,19 +36,13 @@ public class Run2 {
     public static void runAlgorithm(VFSGroupDataset<FImage> trainingData, VFSListDataset<FImage> testingData) throws IOException {
 
         //Create a print writer to output the data to a file.
-        File outputFile = new File("resources/results/run1.txt");
+        File outputFile = new File("resources/results/run2.txt");
         PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
 
-        //LiblinearAnnotator lla = new LiblinearAnnotator(, LiblinearAnnotator.Mode.MULTICLASS, SolverType.L1R_LR,
-        //        1.0, 0.0, 1.0, true);
 
-        // Patch sampling with Rectangles???
-        RectangleSampler sampler = null;
+
         for(FImage img : trainingData){
-
-            sampler = new RectangleSampler(img, 4, 4, 8, 8);
-            List<Rectangle> rectangles = sampler.allRectangles();
-
+            List<double[]> patchVectors = getPatchVectors(img, 4, 8);
         }
 
         FloatKMeans cluster = FloatKMeans.createExact(500);
@@ -55,50 +51,72 @@ public class Run2 {
     }
 
     /**
+     * Extracts patches from the image at a given step and flattens them into a list of vectors.
+     * @param img Image to be sampled.
+     * @param patchStep Step in x and y direction for sampling.
+     * @param patchDim Sample dimension (patch size = patchDim x patchDim).
+     * @return List of sampled patches flattened into vectors.
+     */
+    private static List<double[]> getPatchVectors(FImage img, int patchStep, int patchDim){
+
+        List<double[]> vectors = new ArrayList<>();
+
+        RectangleSampler sampler = new RectangleSampler(img.normalise(), patchStep, patchStep, patchDim, patchDim);
+
+        for(Rectangle r : sampler.allRectangles()){
+
+            double[] vector = img.normalise().extractROI(r).getDoublePixelVector();
+            vectors.add(vector);
+        }
+
+        return vectors;
+    }
+
+    /**
      * Samples a list of 8x8 patches for an image every 4 pixels in the x and y direction.
      * @param img The image to be sampled.
      * @return List of 8x8 patches.
      */
-    private static List<float[][]> getPatches(FImage img){
+//    private static List<float[][]> getPatches(FImage img){
+//
+//        float[][] pixels = img.pixels;
+//        List<float[][]> patches = new ArrayList<>();
+//
+//        // Sample every 4 pixels
+//        for(int r = 0; r < pixels.length; r += 4){
+//            for(int c = 0; c < pixels[c].length; c += 4){
+//
+//                float[][] patch = new float[8][8];
+//
+//                // Populate patch with pixels
+//                for(int i = 0; i < patch.length; i++){
+//                    for(int j = 0; j < patch[i].length; j++){
+//
+//                        if(r+i < pixels.length && c+j < pixels[i].length){
+//                            patch[i][j] = pixels[r+i][c+j];
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//
+//        return patches;
+//    }
 
-        float[][] pixels = img.pixels;
-        List<float[][]> patches = new ArrayList<>();
-
-        // Sample every 4 pixels
-        for(int r = 0; r < pixels.length; r += 4){
-            for(int c = 0; c < pixels[c].length; c += 4){
-
-                float[][] patch = new float[8][8];
-
-                // Populate patch with pixels
-                for(int i = 0; i < patch.length; i++){
-                    for(int j = 0; j < patch[i].length; j++){
-
-                        if(r+i < pixels.length && c+j < pixels[i].length){
-                            patch[i][j] = pixels[r+i][c+j];
-                        }
-                    }
-                }
-            }
-        }
-
-        return patches;
-    }
-
-    private static double[] flattenAndAdjust(float[][] patch){
-
-        double flat[] = new double[patch.length * patch[0].length];
-        int idx = 0;
-
-        for (int i = 0; i < patch.length; i++){
-            
-            for (int j = 0; j < patch.length; j++){
-                flat[idx++] = patch[i][j];
-            }
-        }
-
-        return centerAndNormalize(flat);
-    }
+//    private static double[] flattenAndAdjust(float[][] patch){
+//
+//        double flat[] = new double[patch.length * patch[0].length];
+//        int idx = 0;
+//
+//        for (int i = 0; i < patch.length; i++){
+//
+//            for (int j = 0; j < patch.length; j++){
+//                flat[idx++] = patch[i][j];
+//            }
+//        }
+//
+//        return centerAndNormalize(flat);
+//    }
 
     /**
      * A static method which mean-centers and normalizes a vector.
