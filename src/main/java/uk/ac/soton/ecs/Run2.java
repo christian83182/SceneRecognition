@@ -1,8 +1,6 @@
 package uk.ac.soton.ecs;
 
 import ch.akuhn.matrix.Vector;
-import org.apache.commons.vfs2.FileObject;
-import org.apache.commons.vfs2.FileSystemException;
 import org.openimaj.data.DataSource;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
@@ -12,7 +10,6 @@ import org.openimaj.feature.SparseIntFV;
 import org.openimaj.feature.local.data.LocalFeatureListDataSource;
 import org.openimaj.feature.local.list.LocalFeatureList;
 import org.openimaj.image.FImage;
-import org.openimaj.image.Image;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.annotation.evaluation.datasets.Caltech101;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
