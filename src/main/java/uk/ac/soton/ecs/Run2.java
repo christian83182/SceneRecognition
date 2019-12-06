@@ -7,6 +7,8 @@ import org.openimaj.data.DataSource;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator;
+import org.openimaj.experiment.evaluation.classification.ClassificationResult;
+import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMAnalyser;
 import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMResult;
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.FeatureExtractor;
@@ -37,13 +39,17 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class Run2 {
     public static void main(String[] args) throws IOException {
         Path trainingDataPath = Paths.get("resources/training/");
         Path testingDataPath = Paths.get("resources/testing/");
         VFSGroupDataset<FImage> trainingData = new VFSGroupDataset<>(trainingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
+
         VFSListDataset<FImage> testingData = new VFSListDataset<>(testingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
+
 
         runAlgorithm(trainingData,testingData);
         Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run2.txt"));
@@ -67,6 +73,17 @@ public class Run2 {
 				1.0, 
 				0.00001
 				);
+
+        //TODO testing data causing problems
+        ClassificationEvaluator<CMResult<String>, String, Record<FImage>> eval =
+                new ClassificationEvaluator<CMResult<String>, String, Record<FImage>>(
+                        annotator,
+                        testingData,
+                        new CMAnalyser<Record<FImage>, String>(CMAnalyser.Strategy.SINGLE));
+
+        // Store guess for each image/record
+        Map<Record<FImage>, ClassificationResult<String>> guesses = eval.evaluate();
+        CMResult<String> result = eval.analyse(guesses);
         
         
         for(FImage img : trainingData){
