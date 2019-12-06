@@ -39,7 +39,7 @@ public class Run2 {
         VFSListDataset<FImage> testingData = new VFSListDataset<>(testingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
 
         runAlgorithm(trainingData,testingData);
-        Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run1.txt"));
+        Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run2.txt"));
         System.out.println("Accuracy = " + accuracy);
     }
 
