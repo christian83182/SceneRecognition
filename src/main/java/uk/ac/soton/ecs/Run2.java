@@ -1,28 +1,14 @@
 package uk.ac.soton.ecs;
 
 import ch.akuhn.matrix.Vector;
-import org.apache.avro.generic.GenericData;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
-<<<<<<< HEAD
 import org.openimaj.experiment.dataset.sampling.GroupedUniformRandomisedSampler;
-=======
-import org.openimaj.feature.local.list.MemoryLocalFeatureList;
->>>>>>> d23cbb31b0b4c769eeeefe4f0de1d458e6ee075d
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
-<<<<<<< HEAD
-import org.openimaj.image.MBFImage;
 import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
-import org.openimaj.image.feature.local.keypoints.Keypoint;
-=======
-import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
->>>>>>> 869af96c9927889b4ba24153c6022697ea876a90
 import org.openimaj.image.pixel.sampling.RectangleSampler;
-import org.openimaj.image.pixel.statistics.HistogramModel;
-import org.openimaj.io.IOUtils;
 import org.openimaj.math.geometry.shape.Rectangle;
-import org.openimaj.math.statistics.distribution.MultidimensionalHistogram;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.FloatKMeans;
 import org.openimaj.util.pair.IntFloatPair;
@@ -34,7 +20,6 @@ import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class Run2 {
