@@ -2,27 +2,32 @@ package uk.ac.soton.ecs;
 
 import ch.akuhn.matrix.Vector;
 import org.apache.avro.generic.GenericData;
+import org.openimaj.data.DataSource;
+import org.openimaj.data.dataset.GroupedDataset;
+import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
-<<<<<<< HEAD
+
 import org.openimaj.experiment.dataset.sampling.GroupedUniformRandomisedSampler;
-=======
+import org.openimaj.feature.local.data.LocalFeatureListDataSource;
+import org.openimaj.feature.local.list.LocalFeatureList;
 import org.openimaj.feature.local.list.MemoryLocalFeatureList;
->>>>>>> d23cbb31b0b4c769eeeefe4f0de1d458e6ee075d
+
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
-<<<<<<< HEAD
+
 import org.openimaj.image.MBFImage;
 import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
 import org.openimaj.image.feature.local.keypoints.Keypoint;
-=======
+
 import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
->>>>>>> 869af96c9927889b4ba24153c6022697ea876a90
+
 import org.openimaj.image.pixel.sampling.RectangleSampler;
 import org.openimaj.image.pixel.statistics.HistogramModel;
 import org.openimaj.io.IOUtils;
 import org.openimaj.math.geometry.shape.Rectangle;
 import org.openimaj.math.statistics.distribution.MultidimensionalHistogram;
+import org.openimaj.ml.clustering.FloatCentroidsResult;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.FloatKMeans;
 import org.openimaj.util.pair.IntFloatPair;
@@ -36,6 +41,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import org.openimaj.image.annotation.evaluation.datasets.Caltech101.Record;
 
 public class Run2 {
     public static void main(String[] args) throws IOException {
@@ -54,44 +61,16 @@ public class Run2 {
         //Create a print writer to output the data to a file.
         File outputFile = new File("resources/results/run2.txt");
         PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
-
-        HardAssigner<float[], float[], IntFloatPair> assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(training, 21), engine);
         
         for(FImage img : trainingData){
 
-            
-
-            List<FloatKeypoint> features = getFeatures(img, 4, 8);
+        	List<float[]> vectors = getFeatures(img, 4, 8);
         }
 
         FloatKMeans cluster = FloatKMeans.createExact(500);
 
         writer.close();
     }
-
-    // Extracts the first 10000 dense SIFT features from the images in the given dataset
- 	static HardAssigner<float[], float[], IntFloatPair> trainQuantiser(
- 			GroupedDataset<String, ListDataset<Record>, Record> groupedDataset, Engine<FloatKeypoint, FImage> engine){
-
- 		List<LocalFeatureList<FloatKeypoint>> allkeys = new ArrayList<LocalFeatureList<FloatKeypoint>>();
-
- 		// Record the list of features extracted from each image
- 		for (Record rec: groupedDataset) {
- 			allkeys.add(engine.findFeatures(rec.getImage()));
- 		}
- 		
- 		if (allkeys.size() > (int) allkeys.size()*0.2)
- 			allkeys = allkeys.subList(0, (int) (allkeys.size()*0.2));
-
- 		// Cluster sample of features using K-Means
- 		FloatKMeans km = FloatKMeans.createKDTreeEnsemble(600);
- 		DataSource<float[]> datasource = new LocalFeatureListDataSource<FloatKeypoint, float[]>(allkeys);
- 		FloatCentroidsResult result = km.cluster(datasource);
-
- 		return result.defaultHardAssigner();
- 		
- 	}
- 	
 
     
     /**
@@ -101,21 +80,24 @@ public class Run2 {
      * @param patchDim Sample dimension (patch size = patchDim x patchDim).
      * @return List of sampled patches flattened into feature vectors.
      */
-    private static List<FloatKeypoint> getFeatures(FImage img, int patchStep, int patchDim){
+    private static List<float[]> getFeatures(FImage img, int patchStep, int patchDim){
 
         List<FloatKeypoint> features = new ArrayList<>();
 
         RectangleSampler sampler = new RectangleSampler(img.normalise(), patchStep, patchStep, patchDim, patchDim);
-
+        
+        List<float[]> vectors = new ArrayList<float[]>();
+        
         for(Rectangle r : sampler.allRectangles()){
 
             float[] vector = img.normalise().extractROI(r).getFloatPixelVector();
-
+            
             // Do I need to center and normalize or does this already do the trick?
-            features.add(new FloatKeypoint(r.x, r.y, 0, 1, vector));
+            //features.add(new FloatKeypoint(r.x, r.y, 0, 1, vector));
+            vectors.add(vector);
         }
 
-        return features;
+        return vectors;
     }
 
     /**
