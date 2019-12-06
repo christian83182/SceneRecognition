@@ -51,17 +51,14 @@ public class Run2 {
         File outputFile = new File("resources/results/run2.txt");
         PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
 
-<<<<<<< HEAD
+        HardAssigner<float[], float[], IntFloatPair> assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(training, 21), engine);
         
-=======
-
-
+        
         for(FImage img : trainingData){
             List<double[]> patchVectors = getPatchVectors(img, 4, 8);
         }
 
         FloatKMeans cluster = FloatKMeans.createExact(500);
->>>>>>> 869af96c9927889b4ba24153c6022697ea876a90
 
         writer.close();
     }
@@ -89,23 +86,7 @@ public class Run2 {
  		
  	}
  	
- 	// Attempts to read the HardAssigner from the cache, or trains one if this can't be done.
- 	private HardAssigner<float[], float[], IntFloatPair> readOrTrainAssigner(DensePatchEngine engine, int nSamples) {
 
- 		HardAssigner<float[], float[], IntFloatPair> assigner = null;
-
- 		// If the assigner wasn't read (successfully), train a new one.
- 		if(assigner == null) {
- 			assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(training, nSamples), engine);
- 			try {
- 				IOUtils.writeToFile(assigner, this.assignerCache);
- 			} catch (IOException e) {
- 				e.printStackTrace();
- 			}
- 		}
- 		return assigner;
- 	}
-    
     
     /**
      * Extracts patches from the image at a given step and flattens them into a list of vectors.
