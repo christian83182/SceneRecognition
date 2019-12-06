@@ -1,14 +1,21 @@
 package uk.ac.soton.ecs;
 
 import ch.akuhn.matrix.Vector;
+import org.openimaj.data.DataSource;
+import org.openimaj.data.dataset.GroupedDataset;
+import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.experiment.dataset.sampling.GroupedUniformRandomisedSampler;
+import org.openimaj.feature.local.data.LocalFeatureListDataSource;
+import org.openimaj.feature.local.list.LocalFeatureList;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
+import org.openimaj.image.annotation.evaluation.datasets.Caltech101.Record;
 import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
 import org.openimaj.image.pixel.sampling.RectangleSampler;
 import org.openimaj.math.geometry.shape.Rectangle;
+import org.openimaj.ml.clustering.FloatCentroidsResult;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.FloatKMeans;
 import org.openimaj.util.pair.IntFloatPair;
