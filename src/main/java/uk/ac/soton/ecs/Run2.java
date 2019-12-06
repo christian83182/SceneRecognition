@@ -1,17 +1,22 @@
 package uk.ac.soton.ecs;
 
 import ch.akuhn.matrix.Vector;
+import org.apache.commons.vfs2.FileObject;
+import org.apache.commons.vfs2.FileSystemException;
 import org.openimaj.data.DataSource;
-import org.openimaj.data.dataset.GroupedDataset;
-import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
-import org.openimaj.experiment.dataset.sampling.GroupedUniformRandomisedSampler;
+import org.openimaj.feature.DoubleFV;
+import org.openimaj.feature.FeatureExtractor;
+import org.openimaj.feature.SparseIntFV;
 import org.openimaj.feature.local.data.LocalFeatureListDataSource;
 import org.openimaj.feature.local.list.LocalFeatureList;
 import org.openimaj.image.FImage;
+import org.openimaj.image.Image;
 import org.openimaj.image.ImageUtilities;
-import org.openimaj.image.annotation.evaluation.datasets.Caltech101.Record;
+import org.openimaj.image.annotation.evaluation.datasets.Caltech101;
+import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
+import org.openimaj.image.feature.local.aggregate.BlockSpatialAggregator;
 import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
 import org.openimaj.image.pixel.sampling.RectangleSampler;
 import org.openimaj.math.geometry.shape.Rectangle;
@@ -47,7 +52,7 @@ public class Run2 {
         File outputFile = new File("resources/results/run2.txt");
         PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
 
-        HardAssigner<float[], float[], IntFloatPair> assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(training, 21), engine);
+        HardAssigner<float[], float[], IntFloatPair> assigner = trainQuantiser(trainingData);
         
         for(FImage img : trainingData){
 
@@ -63,13 +68,13 @@ public class Run2 {
 
     // Extracts the first 10000 dense SIFT features from the images in the given dataset
  	static HardAssigner<float[], float[], IntFloatPair> trainQuantiser(
- 			GroupedDataset<String, ListDataset<Record>, Record> groupedDataset){
+ 			VFSGroupDataset<FImage> groupedDataset){
 
  		List<LocalFeatureList<FloatKeypoint>> allkeys = new ArrayList<>();
 
  		// Record the list of features extracted from each image
- 		for (Record rec: groupedDataset) {
- 			allkeys.add(getFeatures(rec.getImage(), 4,8));
+ 		for (FImage rec: groupedDataset) {
+ 			allkeys.add((LocalFeatureList<FloatKeypoint>) getFeatures(rec.getImage(),4 ,8));
  		}
  		
  		if (allkeys.size() > (int) allkeys.size()*0.2)
@@ -166,5 +171,29 @@ public class Run2 {
         vector.applyCentering();
         vector.times(1/vector.norm());
         return vector.unwrap();
+    }
+
+    class PatchVectorFeatureExtractor implements FeatureExtractor<DoubleFV, Caltech101.Record<FImage>> {
+
+        HardAssigner<float[], float[], IntFloatPair> assigner;
+
+        public PatchVectorFeatureExtractor(HardAssigner<float[], float[], IntFloatPair> assigner){
+
+            this.assigner = assigner;
+        }
+
+        public DoubleFV extractFeature(Caltech101.Record<FImage> r) {
+
+            FImage img = r.getImage();
+
+            BagOfVisualWords<float[]> bovw = new BagOfVisualWords<>(assigner);
+
+            BlockSpatialAggregator<float[], SparseIntFV> spatial =
+                    new BlockSpatialAggregator<>(bovw, 2, 2);
+
+            // Append and normalise the resultant spatial histograms
+            return spatial.aggregate(getFeatures(img, 4, 8), img.getBounds()).normaliseFV();
+
+        }
     }
 }
