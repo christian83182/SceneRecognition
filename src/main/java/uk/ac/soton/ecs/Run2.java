@@ -3,14 +3,20 @@ package uk.ac.soton.ecs;
 import ch.akuhn.matrix.Vector;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
+import org.openimaj.experiment.dataset.sampling.GroupedUniformRandomisedSampler;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.MBFImage;
+import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
+import org.openimaj.image.feature.local.keypoints.Keypoint;
 import org.openimaj.image.pixel.sampling.RectangleSampler;
 import org.openimaj.image.pixel.statistics.HistogramModel;
+import org.openimaj.io.IOUtils;
 import org.openimaj.math.geometry.shape.Rectangle;
 import org.openimaj.math.statistics.distribution.MultidimensionalHistogram;
+import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.FloatKMeans;
+import org.openimaj.util.pair.IntFloatPair;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -40,32 +46,52 @@ public class Run2 {
         File outputFile = new File("resources/results/run1.txt");
         PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
 
-        //LiblinearAnnotator lla = new LiblinearAnnotator(, LiblinearAnnotator.Mode.MULTICLASS, SolverType.L1R_LR,
-        //        1.0, 0.0, 1.0, true);
         
-        
-        MBFImage image = null;
-        HistogramModel model = new HistogramModel( 4, 4, 4 );
-        model.estimateModel( image );
-        
-        MultidimensionalHistogram histogram = model.histogram;
-        
-        
-        
-        // Patch sampling with Rectangles???
-        RectangleSampler sampler = null;
-        for(FImage img : trainingData){
-
-            sampler = new RectangleSampler(img, 4, 4, 8, 8);
-            List<Rectangle> rectangles = sampler.allRectangles();
-
-        }
-
-        FloatKMeans cluster = FloatKMeans.createExact(500);
 
         writer.close();
     }
 
+    // Extracts the first 10000 dense SIFT features from the images in the given dataset
+ 	static HardAssigner<float[], float[], IntFloatPair> trainQuantiser(
+ 			GroupedDataset<String, ListDataset<Record>, Record> groupedDataset, Engine<FloatKeypoint, FImage> engine){
+
+ 		List<LocalFeatureList<FloatKeypoint>> allkeys = new ArrayList<LocalFeatureList<FloatKeypoint>>();
+
+ 		// Record the list of features extracted from each image
+ 		for (Record rec: groupedDataset) {
+ 			allkeys.add(engine.findFeatures(rec.getImage()));
+ 		}
+ 		
+ 		if (allkeys.size() > (int) allkeys.size()*0.2)
+ 			allkeys = allkeys.subList(0, (int) (allkeys.size()*0.2));
+
+ 		// Cluster sample of features using K-Means
+ 		FloatKMeans km = FloatKMeans.createKDTreeEnsemble(600);
+ 		DataSource<float[]> datasource = new LocalFeatureListDataSource<FloatKeypoint, float[]>(allkeys);
+ 		FloatCentroidsResult result = km.cluster(datasource);
+
+ 		return result.defaultHardAssigner();
+ 		
+ 	}
+ 	
+ 	// Attempts to read the HardAssigner from the cache, or trains one if this can't be done.
+ 	private HardAssigner<float[], float[], IntFloatPair> readOrTrainAssigner(DensePatchEngine engine, int nSamples) {
+
+ 		HardAssigner<float[], float[], IntFloatPair> assigner = null;
+
+ 		// If the assigner wasn't read (successfully), train a new one.
+ 		if(assigner == null) {
+ 			assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(training, nSamples), engine);
+ 			try {
+ 				IOUtils.writeToFile(assigner, this.assignerCache);
+ 			} catch (IOException e) {
+ 				e.printStackTrace();
+ 			}
+ 		}
+ 		return assigner;
+ 	}
+    
+    
     /**
      * Samples a list of 8x8 patches for an image every 4 pixels in the x and y direction.
      * @param img The image to be sampled.
