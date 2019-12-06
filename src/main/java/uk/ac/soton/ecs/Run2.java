@@ -47,7 +47,7 @@ public class Run2 {
         File outputFile = new File("resources/results/run2.txt");
         PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
 
-        HardAssigner<float[], float[], IntFloatPair> assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(training, 21), engine);
+        HardAssigner<float[], float[], IntFloatPair> assigner = trainQuantiser(trainingData);
         
         for(FImage img : trainingData){
 
@@ -63,13 +63,13 @@ public class Run2 {
 
     // Extracts the first 10000 dense SIFT features from the images in the given dataset
  	static HardAssigner<float[], float[], IntFloatPair> trainQuantiser(
- 			GroupedDataset<String, ListDataset<Record>, Record> groupedDataset, Engine<FloatKeypoint, FImage> engine){
+ 			VFSGroupDataset<FImage> groupedDataset){
 
  		List<LocalFeatureList<FloatKeypoint>> allkeys = new ArrayList<LocalFeatureList<FloatKeypoint>>();
 
  		// Record the list of features extracted from each image
- 		for (Record rec: groupedDataset) {
- 			allkeys.add(engine.findFeatures(rec.getImage()));
+ 		for (FImage rec: groupedDataset) {
+ 			allkeys.add((LocalFeatureList<FloatKeypoint>) getFeatures(rec.getImage(),4 ,8));
  		}
  		
  		if (allkeys.size() > (int) allkeys.size()*0.2)
