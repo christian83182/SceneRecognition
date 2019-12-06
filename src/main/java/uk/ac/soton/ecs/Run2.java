@@ -4,6 +4,7 @@ import ch.akuhn.matrix.Vector;
 import org.apache.avro.generic.GenericData;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
+import org.openimaj.feature.local.list.MemoryLocalFeatureList;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
@@ -39,10 +40,11 @@ public class Run2 {
         File outputFile = new File("resources/results/run2.txt");
         PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
 
-
-
         for(FImage img : trainingData){
-            List<double[]> patchVectors = getPatchVectors(img, 4, 8);
+
+            
+
+            List<FloatKeypoint> features = getFeatures(img, 4, 8);
         }
 
         FloatKMeans cluster = FloatKMeans.createExact(500);
@@ -51,25 +53,27 @@ public class Run2 {
     }
 
     /**
-     * Extracts patches from the image at a given step and flattens them into a list of vectors.
+     * Extracts patches from the image at a given step and flattens them into a list of feature vectors.
      * @param img Image to be sampled.
      * @param patchStep Step in x and y direction for sampling.
      * @param patchDim Sample dimension (patch size = patchDim x patchDim).
-     * @return List of sampled patches flattened into vectors.
+     * @return List of sampled patches flattened into feature vectors.
      */
-    private static List<double[]> getPatchVectors(FImage img, int patchStep, int patchDim){
+    private static List<FloatKeypoint> getFeatures(FImage img, int patchStep, int patchDim){
 
-        List<double[]> vectors = new ArrayList<>();
+        List<FloatKeypoint> features = new ArrayList<>();
 
         RectangleSampler sampler = new RectangleSampler(img.normalise(), patchStep, patchStep, patchDim, patchDim);
 
         for(Rectangle r : sampler.allRectangles()){
 
-            double[] vector = img.normalise().extractROI(r).getDoublePixelVector();
-            vectors.add(vector);
+            float[] vector = img.normalise().extractROI(r).getFloatPixelVector();
+
+            // Do I need to center and normalize or does this already do the trick?
+            features.add(new FloatKeypoint(r.x, r.y, 0, 1, vector));
         }
 
-        return vectors;
+        return features;
     }
 
     /**
