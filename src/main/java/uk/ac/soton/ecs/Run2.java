@@ -63,13 +63,13 @@ public class Run2 {
 
     // Extracts the first 10000 dense SIFT features from the images in the given dataset
  	static HardAssigner<float[], float[], IntFloatPair> trainQuantiser(
- 			GroupedDataset<String, ListDataset<Record>, Record> groupedDataset, Engine<FloatKeypoint, FImage> engine){
+ 			GroupedDataset<String, ListDataset<Record>, Record> groupedDataset){
 
- 		List<LocalFeatureList<FloatKeypoint>> allkeys = new ArrayList<LocalFeatureList<FloatKeypoint>>();
+ 		List<LocalFeatureList<FloatKeypoint>> allkeys = new ArrayList<>();
 
  		// Record the list of features extracted from each image
  		for (Record rec: groupedDataset) {
- 			allkeys.add(engine.findFeatures(rec.getImage()));
+ 			allkeys.add(getFeatures(rec.getImage(), 4,8));
  		}
  		
  		if (allkeys.size() > (int) allkeys.size()*0.2)
