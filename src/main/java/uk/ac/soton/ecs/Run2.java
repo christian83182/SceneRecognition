@@ -1,9 +1,13 @@
 package uk.ac.soton.ecs;
 
 import ch.akuhn.matrix.Vector;
+import de.bwaldvogel.liblinear.SolverType;
+
 import org.openimaj.data.DataSource;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
+import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator;
+import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMResult;
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.FeatureExtractor;
 import org.openimaj.feature.SparseIntFV;
@@ -12,11 +16,14 @@ import org.openimaj.feature.local.list.LocalFeatureList;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.annotation.evaluation.datasets.Caltech101;
+import org.openimaj.image.annotation.evaluation.datasets.Caltech101.Record;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
 import org.openimaj.image.feature.local.aggregate.BlockSpatialAggregator;
 import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
 import org.openimaj.image.pixel.sampling.RectangleSampler;
 import org.openimaj.math.geometry.shape.Rectangle;
+import org.openimaj.ml.annotation.linear.LiblinearAnnotator;
+import org.openimaj.ml.annotation.linear.LiblinearAnnotator.Mode;
 import org.openimaj.ml.clustering.FloatCentroidsResult;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.FloatKMeans;
@@ -50,6 +57,17 @@ public class Run2 {
         PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
 
         HardAssigner<float[], float[], IntFloatPair> assigner = trainQuantiser(trainingData);
+        
+        FeatureExtractor<DoubleFV, Record<FImage>> extractor = new PatchVectorFeatureExtractor(assigner);
+        
+        LiblinearAnnotator<Record<FImage>, String> annotator = new LiblinearAnnotator<>(
+				extractor, 
+				Mode.MULTICLASS, 
+				SolverType.L2R_L2LOSS_SVC, 
+				1.0, 
+				0.00001
+				);
+        
         
         for(FImage img : trainingData){
 
@@ -170,7 +188,7 @@ public class Run2 {
         return vector.unwrap();
     }
 
-    class PatchVectorFeatureExtractor implements FeatureExtractor<DoubleFV, Caltech101.Record<FImage>> {
+    static class PatchVectorFeatureExtractor implements FeatureExtractor<DoubleFV, Caltech101.Record<FImage>> {
 
         HardAssigner<float[], float[], IntFloatPair> assigner;
 
