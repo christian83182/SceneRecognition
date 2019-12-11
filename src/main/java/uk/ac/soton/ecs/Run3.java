@@ -3,34 +3,42 @@ package uk.ac.soton.ecs;
 import ch.akuhn.matrix.Vector;
 import org.datavec.api.io.labels.ParentPathLabelGenerator;
 import org.datavec.api.io.labels.PathLabelGenerator;
-import org.datavec.api.records.listener.impl.LogRecordListener;
 import org.datavec.api.split.FileSplit;
 import org.datavec.api.writable.Text;
 import org.datavec.api.writable.Writable;
 import org.datavec.image.loader.NativeImageLoader;
 import org.datavec.image.recordreader.ImageRecordReader;
+import org.datavec.image.transform.FlipImageTransform;
+import org.datavec.image.transform.ImageTransform;
+import org.datavec.image.transform.PipelineImageTransform;
 import org.deeplearning4j.api.storage.StatsStorage;
 import org.deeplearning4j.datasets.datavec.RecordReaderDataSetIterator;
-import org.deeplearning4j.nn.conf.*;
-import org.deeplearning4j.nn.conf.distribution.Distribution;
-import org.deeplearning4j.nn.conf.distribution.NormalDistribution;
-import org.deeplearning4j.nn.conf.inputs.InputType;
-import org.deeplearning4j.nn.conf.layers.*;
+import org.deeplearning4j.nn.api.OptimizationAlgorithm;
+import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
+import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
+import org.deeplearning4j.nn.conf.layers.OutputLayer;
+import org.deeplearning4j.nn.conf.layers.SubsamplingLayer;
+import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
-import org.deeplearning4j.nn.weights.WeightInitDistribution;
-
-import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
+import org.deeplearning4j.nn.transferlearning.FineTuneConfiguration;
+import org.deeplearning4j.nn.transferlearning.TransferLearning;
+import org.deeplearning4j.nn.weights.WeightInit;
 import org.deeplearning4j.ui.api.UIServer;
 import org.deeplearning4j.ui.stats.StatsListener;
 import org.deeplearning4j.ui.storage.InMemoryStatsStorage;
+import org.deeplearning4j.zoo.PretrainedType;
+import org.deeplearning4j.zoo.ZooModel;
+import org.deeplearning4j.zoo.model.AlexNet;
+import org.deeplearning4j.zoo.model.VGG16;
+import org.deeplearning4j.zoo.model.VGG19;
 import org.nd4j.evaluation.classification.Evaluation;
 import org.nd4j.linalg.activations.Activation;
-import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
 import org.nd4j.linalg.dataset.api.preprocessor.DataNormalization;
 import org.nd4j.linalg.dataset.api.preprocessor.ImagePreProcessingScaler;
-import org.nd4j.linalg.learning.config.AdaDelta;
+import org.nd4j.linalg.learning.config.Nesterovs;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
+import org.nd4j.linalg.primitives.Pair;
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.DoubleFVComparison;
 import org.openimaj.image.FImage;
@@ -43,6 +51,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 import java.util.stream.Stream;
 
@@ -52,9 +62,9 @@ public class Run3 {
     private static int height = 256;
     private static int width = 256;
     private static int channels = 1;
-    private static int batchSize = 16;
+    private static int batchSize = 64;
     private static int numOfLabels = 15;
-    private static int epochs = 10;
+    private static int epochs = 1000;
 
     private static final int randomSeed = 2019;
     private static Random random = new Random(randomSeed);
@@ -69,54 +79,35 @@ public class Run3 {
         File testingData = new File("resources/testingSubset/");
 
         //Define some FileSplits which will randomize the order of data as it's fed into the CNN.
-        FileSplit trainingFileSplit = new FileSplit(trainingData, NativeImageLoader.ALLOWED_FORMATS, random);
-
-        //A class which labels data according to its folder structure.
-        ParentPathLabelGenerator trainingLabelMaker = new ParentPathLabelGenerator();
-
+        FileSplit testingFileSplit = new FileSplit(testingData, NativeImageLoader.ALLOWED_FORMATS, random);
+        //A class which labels data according to its label in correct.txt
+        FileLabelGenerator testingLabelMaker = new FileLabelGenerator();
         //A class which will read images from the given FileSplits.
-        ImageRecordReader trainingRecordReader = new ImageRecordReader(height, width, channels, trainingLabelMaker);
-        trainingRecordReader.initialize(trainingFileSplit);
-
+        ImageRecordReader testingRecordReader = new ImageRecordReader(height, width, channels, testingLabelMaker);
+        testingRecordReader.initialize(testingFileSplit);
         //Create an iterator to iterate over the images in the training and testing dataset.
-        DataSetIterator trainingIterator = new RecordReaderDataSetIterator(trainingRecordReader, batchSize, 1, numOfLabels);
-
+        DataSetIterator testingIterator = new RecordReaderDataSetIterator(testingRecordReader, batchSize, 1, numOfLabels);
         //Create and add an image preprocessor which normalizes the value of the pixels to values between 0 and 1.
         DataNormalization normalizer = new ImagePreProcessingScaler(0,1);
+        normalizer.fit(testingIterator);
+        testingIterator.setPreProcessor(normalizer);
+
+        List<Pair<ImageTransform,Double>> transformList = Arrays.asList(
+                new Pair<>(new FlipImageTransform(1),0.5)
+                /*new Pair<>(new EqualizeHistTransform(),0.5),
+                new Pair<>(new CropImageTransform(random, 50), 0.5)*/);
+        PipelineImageTransform pipeline = new PipelineImageTransform(transformList,true);
+
+        FileSplit trainingFileSplit = new FileSplit(trainingData, NativeImageLoader.ALLOWED_FORMATS, random);
+        ParentPathLabelGenerator trainingLabelMaker = new ParentPathLabelGenerator();
+        ImageRecordReader trainingRecordReader = new ImageRecordReader(height, width, channels, trainingLabelMaker);
+        trainingRecordReader.initialize(trainingFileSplit,pipeline);
+        DataSetIterator trainingIterator = new RecordReaderDataSetIterator(trainingRecordReader, batchSize, 1, numOfLabels);
         normalizer.fit(trainingIterator);
         trainingIterator.setPreProcessor(normalizer);
 
         logger.info("--- BUILDING MODEL ---");
-        double nonZeroBias = 1;
-        double dropOut = 0.5;
-        MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
-                .seed(randomSeed)
-                .weightInit(new NormalDistribution(0.0, 0.01))
-                .activation(Activation.RELU)
-                .updater(new AdaDelta())
-                .gradientNormalization(GradientNormalization.RenormalizeL2PerLayer) // normalize to prevent vanishing or exploding gradients
-                .l2(5 * 1e-4)
-                .list()
-                .layer(convInit("cnn1", channels, 96, new int[]{11, 11}, new int[]{4, 4}, new int[]{3, 3}, 0))
-                .layer(new LocalResponseNormalization.Builder().name("lrn1").build())
-                .layer(maxPool("maxpool1", new int[]{3,3}))
-                .layer(conv5x5("cnn2", 256, new int[] {1,1}, new int[] {2,2}, nonZeroBias))
-                .layer(new LocalResponseNormalization.Builder().name("lrn2").build())
-                .layer(maxPool("maxpool2", new int[]{3,3}))
-                .layer(conv3x3("cnn3", 384, 0))
-                .layer(conv3x3("cnn4", 384, nonZeroBias))
-                .layer(conv3x3("cnn5", 256, nonZeroBias))
-                .layer(maxPool("maxpool3", new int[]{3,3}))
-                .layer(fullyConnected("ffn1", 4096, nonZeroBias, dropOut, new NormalDistribution(0, 0.005)))
-                .layer(fullyConnected("ffn2", 4096, nonZeroBias, dropOut, new NormalDistribution(0, 0.005)))
-                .layer(new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
-                        .name("output")
-                        .nOut(numOfLabels)
-                        .activation(Activation.SOFTMAX)
-                        .build())
-                .setInputType(InputType.convolutional(height, width, channels))
-                .build();
-        MultiLayerNetwork model = new MultiLayerNetwork(conf);
+        ComputationGraph model = getModel();
         model.init();
 
         //Initialize the user interface backend
@@ -128,21 +119,49 @@ public class Run3 {
         //train the model by calling fit() epoch times.
         for (int i = 0; i < epochs; i++) {
             model.fit(trainingIterator);
-            System.out.println("Epoch " + i +" Complete");
+            logger.info("Completed Epoch: " + (i));
+            if(i %5 == 0){
+                Evaluation eval = model.evaluate(testingIterator);
+                logger.info(eval.stats(false, false));
+            }
         }
+    }
 
-        //Following similar steps to creating a DataSetIterator for the training data.
-        //In this case, a custom FileLabelGenerator class is used which labels testing data according to correct.txt
-        FileSplit testingFileSplit = new FileSplit(testingData, NativeImageLoader.ALLOWED_FORMATS, random);
-        FileLabelGenerator testingLabelMaker = new FileLabelGenerator();
-        ImageRecordReader testingRecordReader = new ImageRecordReader(height, width, channels, testingLabelMaker);
-        testingRecordReader.initialize(testingFileSplit);
-        DataSetIterator testingIterator = new RecordReaderDataSetIterator(testingRecordReader, batchSize, 1, numOfLabels);
-        normalizer.fit(testingIterator);
-        testingIterator.setPreProcessor(normalizer);
+    private ComputationGraph getModel() throws IOException {
+        ZooModel zooModel = VGG16.builder().build();
+        System.out.println(zooModel.pretrainedUrl(PretrainedType.IMAGENET));
+        ComputationGraph model = (ComputationGraph) zooModel.initPretrained(PretrainedType.IMAGENET);
 
-        Evaluation evaluation = model.evaluate(testingIterator);
-        System.out.println(evaluation.stats());
+        FineTuneConfiguration fineTuneConf = new FineTuneConfiguration.Builder()
+                .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
+                .updater(new Nesterovs(5e-5))
+                .seed(randomSeed)
+                .build();
+
+        ComputationGraph tunedModel = new TransferLearning.GraphBuilder(model)
+                .fineTuneConfiguration(fineTuneConf)
+                .setFeatureExtractor("fc2")
+                .removeVertexKeepConnections("predictions")
+                .addLayer("predictions",
+                        new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
+                                .nIn(4096).nOut(numOfLabels)
+                                .weightInit(WeightInit.XAVIER)
+                                .activation(Activation.SOFTMAX).build(), "fc2")
+                .build();
+
+        return tunedModel;
+    }
+
+    private ConvolutionLayer convInit(String name, int in, int out, int[] kernel, int[] stride, int[] pad, double bias) {
+        return new ConvolutionLayer.Builder(kernel, stride, pad).name(name).nIn(in).nOut(out).biasInit(bias).build();
+    }
+
+    private ConvolutionLayer conv5x5(String name, int out, int[] stride, int[] pad, double bias) {
+        return new ConvolutionLayer.Builder(new int[]{5,5}, stride, pad).name(name).nOut(out).biasInit(bias).build();
+    }
+
+    private SubsamplingLayer maxPool(String name,  int[] kernel) {
+        return new SubsamplingLayer.Builder(kernel, new int[]{2,2}).name(name).build();
     }
 
     private static boolean isSameImage(FImage firstImage, FImage secondImage){
@@ -173,27 +192,6 @@ public class Run3 {
         //Return the euclidean distance between both vectors using the DoubleFX.compare() function.
         return firstVectorNormal.compare(secondVectorNormal, DoubleFVComparison.EUCLIDEAN);
     }
-
-    private ConvolutionLayer convInit(String name, int in, int out, int[] kernel, int[] stride, int[] pad, double bias) {
-        return new ConvolutionLayer.Builder(kernel, stride, pad).name(name).nIn(in).nOut(out).biasInit(bias).build();
-    }
-
-    private ConvolutionLayer conv3x3(String name, int out, double bias) {
-        return new ConvolutionLayer.Builder(new int[]{3,3}, new int[] {1,1}, new int[] {1,1}).name(name).nOut(out).biasInit(bias).build();
-    }
-
-    private ConvolutionLayer conv5x5(String name, int out, int[] stride, int[] pad, double bias) {
-        return new ConvolutionLayer.Builder(new int[]{5,5}, stride, pad).name(name).nOut(out).biasInit(bias).build();
-    }
-
-    private SubsamplingLayer maxPool(String name,  int[] kernel) {
-        return new SubsamplingLayer.Builder(kernel, new int[]{2,2}).name(name).build();
-    }
-
-    private DenseLayer fullyConnected(String name, int out, double bias, double dropOut, Distribution dist) {
-        return new DenseLayer.Builder().name(name).nOut(out).biasInit(bias).dropOut(dropOut).weightInit(new WeightInitDistribution(dist)).build();
-    }
-
 
     //A custom class which will label data according to the correct.txt file in the resources folder.
     static class FileLabelGenerator implements PathLabelGenerator{
