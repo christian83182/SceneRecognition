@@ -6,6 +6,7 @@ import de.bwaldvogel.liblinear.SolverType;
 import org.openimaj.data.DataSource;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
+import org.openimaj.experiment.dataset.split.GroupedRandomSplitter;
 import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator;
 import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMResult;
 import org.openimaj.feature.DoubleFV;
@@ -13,10 +14,14 @@ import org.openimaj.feature.FeatureExtractor;
 import org.openimaj.feature.SparseIntFV;
 import org.openimaj.feature.local.data.LocalFeatureListDataSource;
 import org.openimaj.feature.local.list.LocalFeatureList;
+import org.openimaj.feature.local.list.MemoryLocalFeatureList;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.annotation.evaluation.datasets.Caltech101;
 import org.openimaj.image.annotation.evaluation.datasets.Caltech101.Record;
+import org.openimaj.image.feature.dense.gradient.dsift.DenseSIFT;
+import org.openimaj.image.feature.dense.gradient.dsift.FloatDSIFTKeypoint;
+import org.openimaj.image.feature.dense.gradient.dsift.PyramidDenseSIFT;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
 import org.openimaj.image.feature.local.aggregate.BlockSpatialAggregator;
 import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
@@ -45,17 +50,26 @@ public class Run2 {
         VFSGroupDataset<FImage> trainingData = new VFSGroupDataset<>(trainingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
         VFSListDataset<FImage> testingData = new VFSListDataset<>(testingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
 
+        
+        //GroupedRandomSplitter<String, Record> splits = new GroupedRandomSplitter<String, Record>(allData, 90, 0, 10);
+		//GroupDataset test 	 = splits.getTestDataset();
+
+        
         runAlgorithm(trainingData,testingData);
         Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run2.txt"));
         System.out.println("Accuracy = " + accuracy);
     }
 
     public static void runAlgorithm(VFSGroupDataset<FImage> trainingData, VFSListDataset<FImage> testingData) throws IOException {
-
+    	System.out.println("gets here");
         //Create a print writer to output the data to a file.
         File outputFile = new File("resources/results/run2.txt");
         PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
-
+        
+//        DenseSIFT dsift = new DenseSIFT(3, 7);
+//        
+//		PyramidDenseSIFT<FImage> pdsift = new PyramidDenseSIFT<FImage>(dsift, 6f, 4);
+        
         HardAssigner<float[], float[], IntFloatPair> assigner = trainQuantiser(trainingData);
         
         FeatureExtractor<DoubleFV, Record<FImage>> extractor = new PatchVectorFeatureExtractor(assigner);
@@ -85,11 +99,17 @@ public class Run2 {
  	static HardAssigner<float[], float[], IntFloatPair> trainQuantiser(
  			VFSGroupDataset<FImage> groupedDataset){
 
- 		List<LocalFeatureList<FloatKeypoint>> allkeys = new ArrayList<>();
+ 		List<LocalFeatureList<FloatKeypoint>> allkeys = new ArrayList<LocalFeatureList<FloatKeypoint>>();
 
  		// Record the list of features extracted from each image
  		for (FImage rec: groupedDataset) {
- 			allkeys.add((LocalFeatureList<FloatKeypoint>) getFeatures(rec.getImage(),4 ,8));
+ 			FImage img = rec.getImage();
+ 			
+// 		    pdsift.analyseImage(img);
+// 		    allkeys.add(pdsift.getFloatKeypoints(0.005f));
+ 			
+ 			//LocalFeatureList<FloatKeypoint> features = 
+ 			allkeys.add( getFeatures(rec.getImage(),4 ,8));
  		}
  		
  		if (allkeys.size() > (int) allkeys.size()*0.2)
@@ -113,7 +133,7 @@ public class Run2 {
      * @param patchDim Sample dimension (patch size = patchDim x patchDim).
      * @return List of sampled patches flattened into feature vectors.
      */
-    private static List<FloatKeypoint> getFeatures(FImage img, int patchStep, int patchDim){
+    private static LocalFeatureList<FloatKeypoint> getFeatures(FImage img, int patchStep, int patchDim){
 
         List<FloatKeypoint> features = new ArrayList<>();
 
@@ -126,8 +146,10 @@ public class Run2 {
             // Do I need to center and normalize or does this already do the trick?
             features.add(new FloatKeypoint(r.x, r.y, 0, 1, vector));
         }
-
-        return features;
+        
+        MemoryLocalFeatureList<FloatKeypoint> featureList = new MemoryLocalFeatureList<FloatKeypoint>(features);
+        
+        return featureList;
     }
 
     /**
