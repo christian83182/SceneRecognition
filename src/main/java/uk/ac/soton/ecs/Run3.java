@@ -8,14 +8,14 @@ import org.datavec.api.writable.Text;
 import org.datavec.api.writable.Writable;
 import org.datavec.image.loader.NativeImageLoader;
 import org.datavec.image.recordreader.ImageRecordReader;
-import org.datavec.image.transform.FlipImageTransform;
-import org.datavec.image.transform.ImageTransform;
-import org.datavec.image.transform.PipelineImageTransform;
+import org.datavec.image.transform.*;
 import org.deeplearning4j.api.storage.StatsStorage;
 import org.deeplearning4j.datasets.datavec.RecordReaderDataSetIterator;
 import org.deeplearning4j.nn.api.OptimizationAlgorithm;
 import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
+import org.deeplearning4j.nn.conf.distribution.NormalDistribution;
 import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
+import org.deeplearning4j.nn.conf.layers.DenseLayer;
 import org.deeplearning4j.nn.conf.layers.OutputLayer;
 import org.deeplearning4j.nn.conf.layers.SubsamplingLayer;
 import org.deeplearning4j.nn.graph.ComputationGraph;
@@ -29,6 +29,7 @@ import org.deeplearning4j.ui.storage.InMemoryStatsStorage;
 import org.deeplearning4j.zoo.PretrainedType;
 import org.deeplearning4j.zoo.ZooModel;
 import org.deeplearning4j.zoo.model.AlexNet;
+import org.deeplearning4j.zoo.model.ResNet50;
 import org.deeplearning4j.zoo.model.VGG16;
 import org.deeplearning4j.zoo.model.VGG19;
 import org.nd4j.evaluation.classification.Evaluation;
@@ -59,10 +60,10 @@ import java.util.stream.Stream;
 public class Run3 {
     private final static Logger logger = LoggerFactory.getLogger(Run3.class);
     private final static Double SIMILARITY_THRESHOLD = 0.4;
-    private static int height = 256;
-    private static int width = 256;
-    private static int channels = 1;
-    private static int batchSize = 64;
+    private static int height = 224;
+    private static int width = 224;
+    private static int channels = 3;
+    private static int batchSize = 24;
     private static int numOfLabels = 15;
     private static int epochs = 1000;
 
@@ -70,6 +71,8 @@ public class Run3 {
     private static Random random = new Random(randomSeed);
 
     public static void main(String[] args) throws IOException {
+        System.setProperty("org.deeplearning4j.resources.baseurl","https://dl4jdata.blob.core.windows.net/");
+
         Run3 run3 = new Run3();
         run3.run();
     }
@@ -93,9 +96,9 @@ public class Run3 {
         testingIterator.setPreProcessor(normalizer);
 
         List<Pair<ImageTransform,Double>> transformList = Arrays.asList(
-                new Pair<>(new FlipImageTransform(1),0.5)
-                /*new Pair<>(new EqualizeHistTransform(),0.5),
-                new Pair<>(new CropImageTransform(random, 50), 0.5)*/);
+                new Pair<>(new FlipImageTransform(1),0.5),
+                new Pair<>(new EqualizeHistTransform(),0.5),
+                new Pair<>(new CropImageTransform(random, 50), 0.5));
         PipelineImageTransform pipeline = new PipelineImageTransform(transformList,true);
 
         FileSplit trainingFileSplit = new FileSplit(trainingData, NativeImageLoader.ALLOWED_FORMATS, random);
@@ -122,34 +125,37 @@ public class Run3 {
             logger.info("Completed Epoch: " + (i));
             if(i %5 == 0){
                 Evaluation eval = model.evaluate(testingIterator);
-                logger.info(eval.stats(false, false));
+                logger.info(eval.stats(false, true));
+                testingIterator.reset();
             }
+            trainingIterator.reset();
         }
     }
 
     private ComputationGraph getModel() throws IOException {
         ZooModel zooModel = VGG16.builder().build();
-        System.out.println(zooModel.pretrainedUrl(PretrainedType.IMAGENET));
-        ComputationGraph model = (ComputationGraph) zooModel.initPretrained(PretrainedType.IMAGENET);
+        ComputationGraph vgg16 = (ComputationGraph) zooModel.initPretrained();
+        logger.info(vgg16.summary());
 
         FineTuneConfiguration fineTuneConf = new FineTuneConfiguration.Builder()
-                .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
                 .updater(new Nesterovs(5e-5))
                 .seed(randomSeed)
                 .build();
 
-        ComputationGraph tunedModel = new TransferLearning.GraphBuilder(model)
+        ComputationGraph vgg16Transfer = new TransferLearning.GraphBuilder(vgg16)
                 .fineTuneConfiguration(fineTuneConf)
                 .setFeatureExtractor("fc2")
                 .removeVertexKeepConnections("predictions")
                 .addLayer("predictions",
                         new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
                                 .nIn(4096).nOut(numOfLabels)
-                                .weightInit(WeightInit.XAVIER)
-                                .activation(Activation.SOFTMAX).build(), "fc2")
+                                .weightInit(new NormalDistribution(0,0.2*(2.0/(4096+numOfLabels))))
+                                .activation(Activation.SOFTMAX).build(),
+                        "fc2")
                 .build();
+        logger.info(vgg16Transfer.summary());
 
-        return tunedModel;
+        return vgg16Transfer;
     }
 
     private ConvolutionLayer convInit(String name, int in, int out, int[] kernel, int[] stride, int[] pad, double bias) {
