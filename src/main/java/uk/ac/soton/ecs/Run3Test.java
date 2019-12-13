@@ -54,11 +54,10 @@ public class Run3Test {
         VFSListDataset<FImage> testingData = new VFSListDataset<>(testingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
 
         //Split training data into training and testing subsets
-        GroupedRandomSplitter<String, FImage> splits = new GroupedRandomSplitter<>(trainingData, 60, 0, 40);
+        GroupedRandomSplitter<String, FImage> splits = new GroupedRandomSplitter<>(trainingData, 80, 0, 20);
         GroupedDataset<String, ListDataset<FImage>, FImage> trainingSplit = splits.getTrainingDataset();
         GroupedDataset<String, ListDataset<FImage>, FImage> testingSplit = splits.getTestDataset();
 
-        //TODO change step to 3?
         DenseSIFT dsift = new DenseSIFT(5, 7);
         PyramidDenseSIFT<FImage> pdsift = new PyramidDenseSIFT<>(dsift, 6f, 7);
 
@@ -82,7 +81,7 @@ public class Run3Test {
         //Predict classes for images in the testing data
         makeClassPredictions(classifier, testingData);
         System.out.println("Completed predictions on testing data");
-        //DELETE
+        //TODO remove for submission
         Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run3.txt"));
         System.out.println("Accuracy = " + accuracy);
     }
@@ -152,7 +151,7 @@ public class Run3Test {
 
             predictedClass = predictedClass.substring(predictedClass.indexOf("(") + 1);
             predictedClass = predictedClass.substring(0,predictedClass.indexOf(","));
-            
+
             writer.println(testImageCounter + ".jpg " + predictedClass);
             testImageCounter++;
         }
