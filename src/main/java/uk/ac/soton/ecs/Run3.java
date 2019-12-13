@@ -41,9 +41,8 @@ import java.util.List;
 import java.util.Map;
 
 
-public class Run3Test {
+public class Run3 {
 
-    //TODO play around with these numbers and all numbers that aren't variables to improve accuracy
     final static int MAX_FEATURES = 10000;
     final static int CLUSTERS = 500;
 
@@ -63,7 +62,7 @@ public class Run3Test {
 
         HardAssigner<byte[], float[], IntFloatPair> assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(trainingSplit, 100), pdsift);
 
-        FeatureExtractor<SparseIntFV, FImage> extractor = new PHOWExtractor(pdsift, assigner);
+        FeatureExtractor<SparseIntFV, FImage> extractor = new SIFTExtractor(pdsift, assigner);
 
         //Construct and train linear classifier that uses a homogeneous kernel map
         HomogeneousKernelMap homogeneousKernelMap = new HomogeneousKernelMap(HomogeneousKernelMap.KernelType.Chi2, HomogeneousKernelMap.WindowType.Rectangular);
@@ -81,15 +80,13 @@ public class Run3Test {
         //Predict classes for images in the testing data
         makeClassPredictions(classifier, testingData);
         System.out.println("Completed predictions on testing data");
-        //TODO remove for submission
-        Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run3.txt"));
-        System.out.println("Accuracy = " + accuracy);
     }
 
     /**
      * Extracts SIFT features from images, and then clusters them into 500 separate classes
+     *
      * @param trainingSplit The images
-     * @param pdsift The extractor
+     * @param pdsift        The extractor
      * @return The assigner used to assign SIFT features to identifiers
      */
     static HardAssigner<byte[], float[], IntFloatPair> trainQuantiser(GroupedDataset<String, ListDataset<FImage>, FImage> trainingSplit, PyramidDenseSIFT<FImage> pdsift) {
@@ -115,18 +112,17 @@ public class Run3Test {
     }
 
     /**
-     *  FeatureExtractor implementation with which we train the classifier
+     * FeatureExtractor implementation with which we train the classifier
      */
-    static class PHOWExtractor implements FeatureExtractor<SparseIntFV, FImage> {
+    static class SIFTExtractor implements FeatureExtractor<SparseIntFV, FImage> {
         PyramidDenseSIFT<FImage> pdsift;
         HardAssigner<byte[], float[], IntFloatPair> assigner;
 
-        public PHOWExtractor(PyramidDenseSIFT<FImage> pdsift, HardAssigner<byte[], float[], IntFloatPair> assigner) {
+        public SIFTExtractor(PyramidDenseSIFT<FImage> pdsift, HardAssigner<byte[], float[], IntFloatPair> assigner) {
             this.pdsift = pdsift;
             this.assigner = assigner;
         }
 
-        //TODO try using BlockSpatialAggregator or PyramidSpatialAggregator to improve accuracy
         public SparseIntFV extractFeature(FImage image) {
             pdsift.analyseImage(image);
             BagOfVisualWords<byte[]> bovw = new BagOfVisualWords<>(assigner);
@@ -136,7 +132,8 @@ public class Run3Test {
 
     /**
      * Predicts the class of each image in the dataset and writes the predictions to a file
-     * @param classifier The classifier used for predictions
+     *
+     * @param classifier  The classifier used for predictions
      * @param testingData The dataset of images
      * @throws IOException
      */
@@ -150,7 +147,7 @@ public class Run3Test {
             String predictedClass = imageClass.toString();
 
             predictedClass = predictedClass.substring(predictedClass.indexOf("(") + 1);
-            predictedClass = predictedClass.substring(0,predictedClass.indexOf(","));
+            predictedClass = predictedClass.substring(0, predictedClass.indexOf(","));
 
             writer.println(testImageCounter + ".jpg " + predictedClass);
             testImageCounter++;
@@ -158,7 +155,6 @@ public class Run3Test {
 
         writer.close();
     }
-
 
 
 }
