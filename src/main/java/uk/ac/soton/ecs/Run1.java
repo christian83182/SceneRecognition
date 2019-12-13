@@ -20,20 +20,20 @@ import java.util.*;
 import java.util.List;
 
 public class Run1 {
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         Path trainingDataPath = Paths.get("resources/training/");
         Path testingDataPath = Paths.get("resources/testing/");
 
         VFSGroupDataset<FImage> trainingData = new VFSGroupDataset<>(trainingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
         VFSListDataset<FImage> testingData = new VFSListDataset<>(testingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
 
-        int k = findOptimum(convertToGroupedDataset(trainingData));
+        int k = findOptimum(convertToGroupedDataset(trainingData),1,100);
+        System.out.println("\n--------------- DONE -----------------");
+        System.out.println("Optimum K: " + k);
+        System.out.println("----------------------------------------\n");
 
         Map<String,String> classificationMap = runAlgorithm(convertToGroupedDataset(trainingData),testingData, k);
         writeResultsToFile(classificationMap);
-
-        /*Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run1.txt"));
-        System.out.println("Accuracy= " + accuracy);*/
     }
 
     /**
@@ -143,14 +143,35 @@ public class Run1 {
         return newDataset;
     }
 
-    private static int findOptimum(GroupedDataset<String, ListDataset<FImage>, FImage> dataset) throws IOException {
-        System.out.println("Average Accuracy for k = 10: " + computeMeanAccuracy(dataset, 10));
-        return 10;
+    private static int findOptimum(GroupedDataset<String, ListDataset<FImage>, FImage> dataset, int upperBound, int lowerBound) throws InterruptedException, IOException {
+        final Double GOLDEN_RATIO = (Math.sqrt(5)+1)/2;
+
+        int firstSearchPoint =  (int)(lowerBound - ( lowerBound - upperBound ) / GOLDEN_RATIO);
+        int secondSearchPoint =  (int)(upperBound + ( lowerBound - upperBound ) / GOLDEN_RATIO);
+
+        while(firstSearchPoint - secondSearchPoint > 1){
+            if(computeMeanAccuracy(dataset,firstSearchPoint) < computeMeanAccuracy(dataset,secondSearchPoint)){
+                lowerBound = secondSearchPoint;
+            } else {
+                upperBound = firstSearchPoint;
+            }
+            firstSearchPoint =  (int)(lowerBound - ( lowerBound - upperBound ) / GOLDEN_RATIO);
+            secondSearchPoint = (int)(upperBound + ( lowerBound - upperBound ) / GOLDEN_RATIO);
+
+            System.out.println("[INFO] Current Optimum: "+ ((upperBound+lowerBound)/2));
+        }
+        return (int)(Math.round((upperBound+lowerBound)/2.0));
+    }
+
+    private static double testFunc(double x){
+        return Math.pow((x-2),2);
     }
 
     private static double computeMeanAccuracy(GroupedDataset<String, ListDataset<FImage>, FImage> dataset, int k) throws IOException {
+        int repetitions = 10;
         DoubleSummaryStatistics stats = new DoubleSummaryStatistics();
-        for(int i = 0; i < 5; i++){
+
+        for(int i = 0; i < repetitions; i++){
             GroupedRandomSplitter<String,FImage> splitter = new GroupedRandomSplitter<>(dataset, 80,0,20);
             GroupedDataset<String, ListDataset<FImage>, FImage> trainingDataset = splitter.getTrainingDataset();
             GroupedDataset<String, ListDataset<FImage>, FImage> testingDataset = splitter.getTestDataset();
@@ -168,7 +189,7 @@ public class Run1 {
             }
 
             Double accuracy = Utils.computeAccuracy(correctMap, resultMap);
-            System.out.println("[INFO] Accuracy for run " + i + "/" + 5 +": " + accuracy);
+            System.out.println("[INFO] Accuracy for run " + (i+1) + "/" + repetitions +" with k=" + k +": " + accuracy);
             stats.accept(accuracy);
         }
         return stats.getAverage();
