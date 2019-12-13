@@ -23,7 +23,7 @@ public class Run1 {
         Path testingDataPath = Paths.get("resources/testing/");
         VFSGroupDataset<FImage> trainingData = new VFSGroupDataset<>(trainingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
         VFSListDataset<FImage> testingData = new VFSListDataset<>(testingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
-        Integer k = 21; //current optimum.
+        Integer k = 10;
 
         Map<String,String> classificationMap = runAlgorithm(trainingData,testingData, k);
         writeResultsToFile(classificationMap);
@@ -48,17 +48,22 @@ public class Run1 {
         ResizeProcessor resizeProcessor = new ResizeProcessor(16,16,false);
 
         //Loop over each image in each directory and add their vector representation to the vectorMap.
+        System.out.println("[INFO] Computing 'tiny-image' vector for each image... ");
         trainingData.forEach((directory, imageDataset) -> imageDataset.forEach(trainingImage -> {
             double[] trainingVector = resizeAndGetVector(resizeProcessor, trainingImage);
             vectorMap.put(trainingVector,directory);
         }));
 
         //Create a DoubleNearestNeighbourExact object using the 256-dimensional vectors computed from the training data.
+        System.out.println("[INFO] Adding vectors to vector space...");
         double[][] vectors = vectorMap.keySet().toArray(new double[0][0]);
         DoubleNearestNeighboursExact knn = new DoubleNearestNeighboursExact(vectors);
 
         //Iterate over each image in the testing dataset.
         for(int testImageCounter = 0; testImageCounter < testingData.size(); testImageCounter++ ){
+            if(testImageCounter %250 ==0){
+                System.out.println("[INFO] Classifying testing images " + testImageCounter + "/" + testingData.size());
+            }
             FImage testImage = testingData.get(testImageCounter);
 
             //Resize the test image and flatten it to a 256-dimensional vector.
@@ -84,6 +89,7 @@ public class Run1 {
             }
         }
 
+        System.out.println("[INFO] Done");
         return classificationMap;
     }
 
@@ -93,7 +99,7 @@ public class Run1 {
             PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
 
             for(String mapKey : classificationMap.keySet()){
-                writer.write(mapKey + " " + classificationMap.get(mapKey));
+                writer.write(mapKey + " " + classificationMap.get(mapKey) +"\n");
             }
             writer.close();
             return true;
