@@ -15,10 +15,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Run1 {
     public static void main(String[] args) throws IOException {
@@ -28,7 +25,8 @@ public class Run1 {
         VFSListDataset<FImage> testingData = new VFSListDataset<>(testingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
         Integer k = 21; //current optimum.
 
-        runAlgorithm(trainingData,testingData, k);
+        Map<String,String> classificationMap = runAlgorithm(trainingData,testingData, k);
+        writeResultsToFile(classificationMap);
         Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run1.txt"));
         System.out.println("Accuracy= " + accuracy);
     }
@@ -42,10 +40,8 @@ public class Run1 {
      * @param k The value to be used as k in the k-nearest-neighbours algorithm.
      * @throws IOException If writing to the file fails.
      */
-    public static void runAlgorithm(VFSGroupDataset<FImage> trainingData, VFSListDataset<FImage> testingData, Integer k) throws IOException {
-        //Create a print writer to output the data to a file.
-        File outputFile = new File("resources/results/run1.txt");
-        PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
+    public static Map<String,String> runAlgorithm(VFSGroupDataset<FImage> trainingData, VFSListDataset<FImage> testingData, Integer k) throws IOException {
+        Map<String,String> classificationMap = new TreeMap<>();
 
         //Create a map to store the 'tiny image' vectors and their respective categories.
         Map<double[],String> vectorMap = new HashMap<>();
@@ -83,12 +79,28 @@ public class Run1 {
             Double maxDistance = Collections.max(voteMap.values());
             for (String classification: voteMap.keySet()) {
                 if (voteMap.get(classification).equals(maxDistance)){
-                    writer.println(testImageCounter +".jpg " + classification);
+                    classificationMap.put(testImageCounter+".jpg",classification);
                 }
             }
         }
 
-        writer.close();
+        return classificationMap;
+    }
+
+    private static boolean writeResultsToFile(Map<String,String> classificationMap) {
+        try{
+            File outputFile = new File("resources/results/run1.txt");
+            PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
+
+            for(String mapKey : classificationMap.keySet()){
+                writer.write(mapKey + " " + classificationMap.get(mapKey));
+            }
+            writer.close();
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     /**
