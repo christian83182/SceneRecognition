@@ -41,7 +41,7 @@ public class Run1 {
      * @throws IOException If writing to the file fails.
      */
     public static Map<String,String> runAlgorithm(VFSGroupDataset<FImage> trainingData, VFSListDataset<FImage> testingData, Integer k) throws IOException {
-        Map<String,String> classificationMap = new TreeMap<>();
+        Map<String,String> classificationMap = new LinkedHashMap<>();
 
         //Create a map to store the 'tiny image' vectors and their respective categories.
         Map<double[],String> vectorMap = new HashMap<>();
