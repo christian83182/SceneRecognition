@@ -1,8 +1,9 @@
 package uk.ac.soton.ecs;
 
 import ch.akuhn.matrix.Vector;
-import org.openimaj.data.dataset.VFSGroupDataset;
-import org.openimaj.data.dataset.VFSListDataset;
+import org.openimaj.data.dataset.*;
+import org.openimaj.experiment.dataset.split.GroupedRandomSplitter;
+import org.openimaj.experiment.dataset.util.DatasetAdaptors;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.processing.resize.ResizeProcessor;
@@ -16,19 +17,23 @@ import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.List;
 
 public class Run1 {
     public static void main(String[] args) throws IOException {
         Path trainingDataPath = Paths.get("resources/training/");
         Path testingDataPath = Paths.get("resources/testing/");
+
         VFSGroupDataset<FImage> trainingData = new VFSGroupDataset<>(trainingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
         VFSListDataset<FImage> testingData = new VFSListDataset<>(testingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
-        Integer k = 10;
 
-        Map<String,String> classificationMap = runAlgorithm(trainingData,testingData, k);
+        int k = findOptimum(convertToGroupedDataset(trainingData));
+
+        Map<String,String> classificationMap = runAlgorithm(convertToGroupedDataset(trainingData),testingData, k);
         writeResultsToFile(classificationMap);
-        Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run1.txt"));
-        System.out.println("Accuracy= " + accuracy);
+
+        /*Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run1.txt"));
+        System.out.println("Accuracy= " + accuracy);*/
     }
 
     /**
@@ -40,17 +45,16 @@ public class Run1 {
      * @param k The value to be used as k in the k-nearest-neighbours algorithm.
      * @throws IOException If writing to the file fails.
      */
-    public static Map<String,String> runAlgorithm(VFSGroupDataset<FImage> trainingData, VFSListDataset<FImage> testingData, Integer k) throws IOException {
+    public static Map<String,String> runAlgorithm(GroupedDataset<String, ListDataset<FImage>, FImage> trainingData, ListDataset<FImage> testingData, Integer k) throws IOException {
         Map<String,String> classificationMap = new LinkedHashMap<>();
 
         //Create a map to store the 'tiny image' vectors and their respective categories.
         Map<double[],String> vectorMap = new HashMap<>();
-        ResizeProcessor resizeProcessor = new ResizeProcessor(16,16,false);
 
         //Loop over each image in each directory and add their vector representation to the vectorMap.
         System.out.println("[INFO] Computing 'tiny-image' vector for each image... ");
         trainingData.forEach((directory, imageDataset) -> imageDataset.forEach(trainingImage -> {
-            double[] trainingVector = resizeAndGetVector(resizeProcessor, trainingImage);
+            double[] trainingVector = resizeAndGetVector(trainingImage);
             vectorMap.put(trainingVector,directory);
         }));
 
@@ -67,7 +71,7 @@ public class Run1 {
             FImage testImage = testingData.get(testImageCounter);
 
             //Resize the test image and flatten it to a 256-dimensional vector.
-            double[] testVector = resizeAndGetVector(resizeProcessor, testImage);
+            double[] testVector = resizeAndGetVector(testImage);
 
             //Create a Map which will be used to store the weighted vote for the classification of the point.
             Map<String, Double> voteMap = new HashMap<>();
@@ -111,12 +115,13 @@ public class Run1 {
 
     /**
      * A static method which resize an image using a given FImage and ResizeProcessor, then mean-centers the vector, normalizes the vector, and returns the result.
-     * @param resizeProcessor The ResizeProcessor which should be used when resizing the image (Recommended: 16x16 without aspect-ratio preservation).
      * @param image The image from which the resultant vector should be based on.
      * @return The resultant double[] representing an n-dimensional vector.
      */
-    private static double[] resizeAndGetVector(ResizeProcessor resizeProcessor, FImage image){
-        resizeProcessor.processImage(image);
+    private static double[] resizeAndGetVector(FImage image){
+        int minDim = Math.min(image.height, image.width);
+        image = image.extractCenter(minDim, minDim);
+        ResizeProcessor.zoomInplace(image,16,16);
         return centerAndNormalize(image.getDoublePixelVector());
     }
 
@@ -131,4 +136,42 @@ public class Run1 {
         vector.times(1/vector.norm());
         return vector.unwrap();
     }
+
+    private static GroupedDataset<String, ListDataset<FImage>, FImage> convertToGroupedDataset(VFSGroupDataset<FImage> dataset){
+        GroupedDataset<String, ListDataset<FImage>, FImage> newDataset = new MapBackedDataset<>();
+        dataset.forEach(newDataset::put);
+        return newDataset;
+    }
+
+    private static int findOptimum(GroupedDataset<String, ListDataset<FImage>, FImage> dataset) throws IOException {
+        System.out.println("Average Accuracy for k = 10: " + computeMeanAccuracy(dataset, 10));
+        return 10;
+    }
+
+    private static double computeMeanAccuracy(GroupedDataset<String, ListDataset<FImage>, FImage> dataset, int k) throws IOException {
+        DoubleSummaryStatistics stats = new DoubleSummaryStatistics();
+        for(int i = 0; i < 5; i++){
+            GroupedRandomSplitter<String,FImage> splitter = new GroupedRandomSplitter<>(dataset, 80,0,20);
+            GroupedDataset<String, ListDataset<FImage>, FImage> trainingDataset = splitter.getTrainingDataset();
+            GroupedDataset<String, ListDataset<FImage>, FImage> testingDataset = splitter.getTestDataset();
+            ListDataset<FImage> flatTestingDataset = new ListBackedDataset<>(DatasetAdaptors.asList(testingDataset));
+
+            Map<String,String> resultMap = runAlgorithm(trainingDataset, flatTestingDataset,k);
+            HashMap<String,String> correctMap = new LinkedHashMap<>();
+
+            int counter = 0;
+            for(String category : testingDataset.keySet()){
+                for(FImage ignored : testingDataset.get(category)){
+                    correctMap.put(counter + ".jpg", category);
+                    counter++;
+                }
+            }
+
+            Double accuracy = Utils.computeAccuracy(correctMap, resultMap);
+            System.out.println("[INFO] Accuracy for run " + i + "/" + 5 +": " + accuracy);
+            stats.accept(accuracy);
+        }
+        return stats.getAverage();
+    }
+
 }
