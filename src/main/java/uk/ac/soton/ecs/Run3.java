@@ -62,7 +62,7 @@ public class Run3 {
 
         HardAssigner<byte[], float[], IntFloatPair> assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(trainingSplit, 100), pdsift);
 
-        FeatureExtractor<SparseIntFV, FImage> extractor = new PHOWExtractor(pdsift, assigner);
+        FeatureExtractor<SparseIntFV, FImage> extractor = new SIFTExtractor(pdsift, assigner);
 
         //Construct and train linear classifier that uses a homogeneous kernel map
         HomogeneousKernelMap homogeneousKernelMap = new HomogeneousKernelMap(HomogeneousKernelMap.KernelType.Chi2, HomogeneousKernelMap.WindowType.Rectangular);
@@ -114,11 +114,11 @@ public class Run3 {
     /**
      * FeatureExtractor implementation with which we train the classifier
      */
-    static class PHOWExtractor implements FeatureExtractor<SparseIntFV, FImage> {
+    static class SIFTExtractor implements FeatureExtractor<SparseIntFV, FImage> {
         PyramidDenseSIFT<FImage> pdsift;
         HardAssigner<byte[], float[], IntFloatPair> assigner;
 
-        public PHOWExtractor(PyramidDenseSIFT<FImage> pdsift, HardAssigner<byte[], float[], IntFloatPair> assigner) {
+        public SIFTExtractor(PyramidDenseSIFT<FImage> pdsift, HardAssigner<byte[], float[], IntFloatPair> assigner) {
             this.pdsift = pdsift;
             this.assigner = assigner;
         }
