@@ -11,27 +11,18 @@ import org.datavec.image.recordreader.ImageRecordReader;
 import org.datavec.image.transform.*;
 import org.deeplearning4j.api.storage.StatsStorage;
 import org.deeplearning4j.datasets.datavec.RecordReaderDataSetIterator;
-import org.deeplearning4j.nn.api.OptimizationAlgorithm;
-import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
 import org.deeplearning4j.nn.conf.distribution.NormalDistribution;
 import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
-import org.deeplearning4j.nn.conf.layers.DenseLayer;
 import org.deeplearning4j.nn.conf.layers.OutputLayer;
 import org.deeplearning4j.nn.conf.layers.SubsamplingLayer;
 import org.deeplearning4j.nn.graph.ComputationGraph;
-import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.transferlearning.FineTuneConfiguration;
 import org.deeplearning4j.nn.transferlearning.TransferLearning;
-import org.deeplearning4j.nn.weights.WeightInit;
 import org.deeplearning4j.ui.api.UIServer;
 import org.deeplearning4j.ui.stats.StatsListener;
 import org.deeplearning4j.ui.storage.InMemoryStatsStorage;
-import org.deeplearning4j.zoo.PretrainedType;
 import org.deeplearning4j.zoo.ZooModel;
-import org.deeplearning4j.zoo.model.AlexNet;
-import org.deeplearning4j.zoo.model.ResNet50;
 import org.deeplearning4j.zoo.model.VGG16;
-import org.deeplearning4j.zoo.model.VGG19;
 import org.nd4j.evaluation.classification.Evaluation;
 import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
@@ -57,8 +48,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Stream;
 
-public class Run3 {
-    private final static Logger logger = LoggerFactory.getLogger(Run3.class);
+public class Run3Failed {
+    private final static Logger logger = LoggerFactory.getLogger(Run3Failed.class);
     private final static Double SIMILARITY_THRESHOLD = 0.4;
     private static int height = 224;
     private static int width = 224;
@@ -73,8 +64,8 @@ public class Run3 {
     public static void main(String[] args) throws IOException {
         System.setProperty("org.deeplearning4j.resources.baseurl","https://dl4jdata.blob.core.windows.net/");
 
-        Run3 run3 = new Run3();
-        run3.run();
+        Run3Failed run3Failed = new Run3Failed();
+        run3Failed.run();
     }
 
     private void run() throws IOException {
