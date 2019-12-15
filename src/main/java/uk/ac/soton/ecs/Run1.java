@@ -20,18 +20,14 @@ import java.util.*;
 import java.util.List;
 
 public class Run1 {
-    public static void main(String[] args) throws IOException, InterruptedException {
+    public static void main(String[] args) throws IOException {
         Path trainingDataPath = Paths.get("resources/training/");
         Path testingDataPath = Paths.get("resources/testing/");
 
         VFSGroupDataset<FImage> trainingData = new VFSGroupDataset<>(trainingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
         VFSListDataset<FImage> testingData = new VFSListDataset<>(testingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
 
-        int k = findOptimum(convertToGroupedDataset(trainingData),1,100);
-        System.out.println("\n--------------- DONE -----------------");
-        System.out.println("Optimum K: " + k);
-        System.out.println("----------------------------------------\n");
-
+        int k =10;
         Map<String,String> classificationMap = runAlgorithm(convertToGroupedDataset(trainingData),testingData, k);
         writeResultsToFile(classificationMap);
     }
@@ -97,6 +93,11 @@ public class Run1 {
         return classificationMap;
     }
 
+    /**
+     * Writes the results of the classification algorithm to a file. The written file will always be created in 'resources/results' and will be named 'run1.txt'
+     * @param classificationMap The map of key-value pairs containing the classifications. Keys should be the name of the files, while the value for each key should be its classification.
+     * @return Returns true if successful, false otherwise.
+     */
     private static boolean writeResultsToFile(Map<String,String> classificationMap) {
         try{
             File outputFile = new File("resources/results/run1.txt");
@@ -137,20 +138,34 @@ public class Run1 {
         return vector.unwrap();
     }
 
+    /**
+     * Converts a VFSGroupDataset into a more generic GroupedDataset. This cannot be done through the type system, hence the existance of this method.
+     * @param dataset The VFSGroupDataset to be converted.
+     * @return The converted dataset.
+     */
     private static GroupedDataset<String, ListDataset<FImage>, FImage> convertToGroupedDataset(VFSGroupDataset<FImage> dataset){
         GroupedDataset<String, ListDataset<FImage>, FImage> newDataset = new MapBackedDataset<>();
         dataset.forEach(newDataset::put);
         return newDataset;
     }
 
-    private static int findOptimum(GroupedDataset<String, ListDataset<FImage>, FImage> dataset, int upperBound, int lowerBound) throws InterruptedException, IOException {
+    /**
+     * Uses golden section search to attempt to find an optimum value for k. Experimentally, this has proven ineffective (see report).
+     * @param dataset The dataset on which it should be optimised.
+     * @param upperBound The upper-bound for the value of k.
+     * @param lowerBound The lower-bound for the value of k.
+     * @param reps The number of repetitions which should be carried out when computing the average accuracy for some value of k.
+     * @return The optimum value (in theory)
+     * @throws IOException If the files cannot be read.
+     */
+    private static int findOptimum(GroupedDataset<String, ListDataset<FImage>, FImage> dataset, int upperBound, int lowerBound, int reps) throws IOException {
         final Double GOLDEN_RATIO = (Math.sqrt(5)+1)/2;
 
         int firstSearchPoint =  (int)(lowerBound - ( lowerBound - upperBound ) / GOLDEN_RATIO);
         int secondSearchPoint =  (int)(upperBound + ( lowerBound - upperBound ) / GOLDEN_RATIO);
 
-        while(firstSearchPoint - secondSearchPoint > 1){
-            if(computeMeanAccuracy(dataset,firstSearchPoint) < computeMeanAccuracy(dataset,secondSearchPoint)){
+        while(secondSearchPoint - firstSearchPoint > 1){
+            if(computeMeanAccuracy(dataset,firstSearchPoint,reps) < computeMeanAccuracy(dataset,secondSearchPoint,reps)){
                 lowerBound = secondSearchPoint;
             } else {
                 upperBound = firstSearchPoint;
@@ -163,15 +178,18 @@ public class Run1 {
         return (int)(Math.round((upperBound+lowerBound)/2.0));
     }
 
-    private static double testFunc(double x){
-        return Math.pow((x-2),2);
-    }
-
-    private static double computeMeanAccuracy(GroupedDataset<String, ListDataset<FImage>, FImage> dataset, int k) throws IOException {
-        int repetitions = 10;
+    /**
+     * Computes the mean accuracy of the algorithm by spitting the dataset, and testing it against itself.
+     * @param dataset The dataset which should be used.
+     * @param k The value of k which should be used.
+     * @param reps The number of repetitions which should be carried out.
+     * @return The accuracy of the algorithm for some k, as a value between 0 and 1.
+     * @throws IOException If the files cannot be read.
+     */
+    private static double computeMeanAccuracy(GroupedDataset<String, ListDataset<FImage>, FImage> dataset, int k, int reps) throws IOException {
         DoubleSummaryStatistics stats = new DoubleSummaryStatistics();
 
-        for(int i = 0; i < repetitions; i++){
+        for(int i = 0; i < reps; i++){
             GroupedRandomSplitter<String,FImage> splitter = new GroupedRandomSplitter<>(dataset, 80,0,20);
             GroupedDataset<String, ListDataset<FImage>, FImage> trainingDataset = splitter.getTrainingDataset();
             GroupedDataset<String, ListDataset<FImage>, FImage> testingDataset = splitter.getTestDataset();
@@ -189,9 +207,10 @@ public class Run1 {
             }
 
             Double accuracy = Utils.computeAccuracy(correctMap, resultMap);
-            System.out.println("[INFO] Accuracy for run " + (i+1) + "/" + repetitions +" with k=" + k +": " + accuracy);
+            System.out.println("[INFO] Accuracy for run " + (i+1) + "/" + reps +" with k=" + k +": " + accuracy);
             stats.accept(accuracy);
         }
+        System.out.println("[INFO] Accuracy for k=" + k +": " + stats.getAverage());
         return stats.getAverage();
     }
 
