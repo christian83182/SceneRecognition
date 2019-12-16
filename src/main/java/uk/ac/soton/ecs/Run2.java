@@ -1,11 +1,7 @@
 package uk.ac.soton.ecs;
 
 import ch.akuhn.matrix.Vector;
-import com.hp.hpl.jena.util.cache.RandCache;
 import de.bwaldvogel.liblinear.SolverType;
-import org.openimaj.util.UniformSampler;
-import uk.ac.soton.ecs.Utils;
-
 import org.openimaj.data.DataSource;
 import org.openimaj.data.dataset.GroupedDataset;
 import org.openimaj.data.dataset.ListDataset;
@@ -23,7 +19,6 @@ import org.openimaj.feature.SparseIntFV;
 import org.openimaj.feature.local.data.LocalFeatureListDataSource;
 import org.openimaj.feature.local.list.LocalFeatureList;
 import org.openimaj.feature.local.list.MemoryLocalFeatureList;
-import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
@@ -37,13 +32,10 @@ import org.openimaj.ml.annotation.linear.LiblinearAnnotator.Mode;
 import org.openimaj.ml.clustering.FloatCentroidsResult;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.FloatKMeans;
+import org.openimaj.util.UniformSampler;
 import org.openimaj.util.pair.IntFloatPair;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -60,10 +52,7 @@ public class Run2 {
         VFSListDataset<FImage> testingData = new VFSListDataset<>(testingDataPath.toAbsolutePath().toString(), ImageUtilities.FIMAGE_READER);
         
         runAlgorithm(trainingData,testingData);
-
-        Double accuracy = Utils.computeAccuracy(Paths.get("resources/results/correct.txt"), Paths.get("resources/results/run2.txt"));
-        System.out.println("Accuracy= " + accuracy);
-        System.out.println("Fininshed runnning the algorithm");
+        System.out.println("Finished running algorithm.");
     }
 
     /**
@@ -75,7 +64,7 @@ public class Run2 {
     	
     	
     	GroupedRandomSplitter<String, FImage> splits =
-                new GroupedRandomSplitter<>(trainingData, 10, 0, 90);
+                new GroupedRandomSplitter<>(trainingData, 50, 0, 50);
 
     	
         //Create a print writer to output the data to a file.
@@ -84,7 +73,7 @@ public class Run2 {
 		BufferedWriter bw = new BufferedWriter(writer);
         
 		
-        HardAssigner<float[], float[], IntFloatPair> assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(splits.getTrainingDataset(), 150));
+        HardAssigner<float[], float[], IntFloatPair> assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(splits.getTrainingDataset(), 750));
         
         FeatureExtractor<DoubleFV, FImage> extractor = new PatchVectorFeatureExtractor(assigner);
 
@@ -98,7 +87,7 @@ public class Run2 {
         CMResult<String> result = eval.analyse(guesses);
         System.out.println(result.getDetailReport());
         
-     		/*try {
+     		try {
      			
      			if (!outputFile.exists()) {
      				outputFile.createNewFile();
@@ -121,7 +110,7 @@ public class Run2 {
 
      		} catch (IOException e) {
      			e.printStackTrace();
-     		}*/
+     		}
 
         writer.close();
     }
@@ -130,36 +119,41 @@ public class Run2 {
 
  		List<LocalFeatureList<FloatKeypoint>> sampleKeys = new ArrayList<>();
 
+ 		System.out.println("Image classes:");
  		System.out.println(groupedDataset.getGroups().toString());
- 		
- 		// Record the list of features extracted from each image
+
  		int c = 0;
+        UniformSampler selector = new UniformSampler<Rectangle>();
+
  		for (FImage img : groupedDataset) {
 
             LocalFeatureList<FloatKeypoint> keys = getFeatures(img, 4, 8);
  			
  			System.out.println(++c);
 
-            int size = keys.size();
+ 			// Randomly sampling a fifth of the patch features
+            /*int size = keys.size();
             Random rand = new Random();
 
             for (int i = size - 1; i >= (size - 0.2*size); --i) {
                 Collections.swap(keys, i, rand.nextInt(i + 1));
             }
 
- 			sampleKeys.add(keys.subList((int) (size - 0.2*size), size));
+ 			sampleKeys.add(keys.subList((int) (size - 0.2*size), size));*/
+
+
+            selector.setCollection(keys);
+            LocalFeatureList<FloatKeypoint> sample = new MemoryLocalFeatureList<>(selector.sample((int) (keys.size() * 0.2)));
+            sampleKeys.add(sample);
+
+//        List<Rectangle> samples = selector.sample((int) (sampler.allRectangles().size() * 0.5));
+
+            //sampleKeys.add(keys.subList((int) (keys.size() - 0.2*keys.size()), keys.size()));
  		}
- 		
- 		/*if (allkeys.size() > allkeys.size() * 0.5) {
- 			
- 			allkeys = allkeys.subList(0, (int) (allkeys.size() * 0.5));
- 		}*/
 
- 		// Cluster sample of features using K-Means
+ 		// K-Means clustering of features
  		FloatKMeans km = FloatKMeans.createKDTreeEnsemble(500);
-
  		DataSource<float[]> datasource = new LocalFeatureListDataSource<>(sampleKeys);
-
  		FloatCentroidsResult result = km.cluster(datasource);
 
  		return result.defaultHardAssigner();
@@ -183,18 +177,32 @@ public class Run2 {
 
         for(Rectangle r : sampler.allRectangles()){
 
-            float[] vector = img.normalise().extractROI(r).getFloatPixelVector();
+            double[] doubleVector = centerAndNormalize(img.normalise().extractROI(r).getDoublePixelVector());
 
-            // Do I need to center and normalize or does this already do the trick?
+            float[] vector = new float[doubleVector.length];
+
+            for(int i = 0; i < vector.length; i++){
+                vector[i] = (float) doubleVector[i];
+            }
+
             features.add(new FloatKeypoint(r.x, r.y, 0, 1, vector));
         }
 
-
-        MemoryLocalFeatureList<FloatKeypoint> featureList = new MemoryLocalFeatureList<>(features);
-        
-        return featureList;
+        return new MemoryLocalFeatureList<>(features);
     }
-    
+
+    /**
+     * A static method which mean-centers and normalizes a vector.
+     * @param vectorArray The vector array to be mean-centered and normalized
+     * @return The resultant n-dimensional vector in the form of a double[].
+     */
+    private static double[] centerAndNormalize(double[] vectorArray) {
+        Vector vector = Vector.wrap(vectorArray);
+        vector.applyCentering();
+        vector.times(1/vector.norm());
+        return vector.unwrap();
+    }
+
     static class PatchVectorFeatureExtractor implements FeatureExtractor<DoubleFV, FImage> {
 
         HardAssigner<float[], float[], IntFloatPair> assigner;
@@ -208,7 +216,6 @@ public class Run2 {
 		public DoubleFV extractFeature(FImage img) {
 
             BagOfVisualWords<float[]> bovw = new BagOfVisualWords<>(assigner);
-
             BlockSpatialAggregator<float[], SparseIntFV> spatial = new BlockSpatialAggregator<>(bovw, 4, 4);
 
             // Append and normalise the resultant spatial histograms
