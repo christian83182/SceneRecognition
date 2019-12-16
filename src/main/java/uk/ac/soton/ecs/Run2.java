@@ -202,7 +202,7 @@ public class Run2 {
             BagOfVisualWords<float[]> bovw = new BagOfVisualWords<>(assigner);
 
             // Split image into 4 both vertically and horizontally
-            BlockSpatialAggregator<float[], SparseIntFV> spatial = new BlockSpatialAggregator<>(bovw, 4, 4);
+            BlockSpatialAggregator<float[], SparseIntFV> spatial = new BlockSpatialAggregator<>(bovw, 2, 2);
 
             // Normalise and append the computed histograms
             return spatial.aggregate(getFeatures(img, PATCH_STEP, PATCH_DIM), img.getBounds()).normaliseFV();
