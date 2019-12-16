@@ -1,3 +1,9 @@
 # Project exclude paths
 /target/
+<<<<<<< HEAD
 .idea/
+=======
+.project
+.classpath
+.settings/
+>>>>>>> run2-signe
