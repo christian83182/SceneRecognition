@@ -4,7 +4,6 @@ import java.io.*;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.TreeMap;
 
 public class Utils {
     /**
@@ -18,10 +17,24 @@ public class Utils {
         return computeAccuracy(correctData, createMapFromFile(predictedData));
     }
 
+    /**
+     * Computes an accuracy rating using a correct and prediction file.
+     * @param correctData The Path to the file with the correct answers.
+     * @param classificationMap A map of key-value pairs where the key is the filename and the value is its classification
+     * @return A number between 0 and 1 depicting the accuracy.
+     * @throws IOException If the files cannot be read.
+     */
     public static double computeAccuracy(Path correctData, Map<String,String> classificationMap) throws IOException {
         return computeAccuracy(createMapFromFile(correctData), classificationMap);
     }
 
+    /**
+     * Computes an accuracy rating using a correct and prediction file.
+     * @param correctClassMap A map of key-value pairs where the key is the filename and the value is its correct classification
+     * @param classificationMap A map of key-value pairs where the key is the filename and the value is its classification
+     * @return A number between 0 and 1 depicting the accuracy.
+     * @throws IOException If the files cannot be read.
+     */
     public static double computeAccuracy(Map<String, String> correctClassMap, Map<String,String> classificationMap){
         Double correct = 0.0;
         Double total = 0.0;

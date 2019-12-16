@@ -1,6 +1,5 @@
 package uk.ac.soton.ecs;
 
-import ch.akuhn.matrix.Vector;
 import org.datavec.api.io.labels.ParentPathLabelGenerator;
 import org.datavec.api.io.labels.PathLabelGenerator;
 import org.datavec.api.split.FileSplit;
@@ -12,9 +11,7 @@ import org.datavec.image.transform.*;
 import org.deeplearning4j.api.storage.StatsStorage;
 import org.deeplearning4j.datasets.datavec.RecordReaderDataSetIterator;
 import org.deeplearning4j.nn.conf.distribution.NormalDistribution;
-import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
 import org.deeplearning4j.nn.conf.layers.OutputLayer;
-import org.deeplearning4j.nn.conf.layers.SubsamplingLayer;
 import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.transferlearning.FineTuneConfiguration;
 import org.deeplearning4j.nn.transferlearning.TransferLearning;
@@ -31,10 +28,6 @@ import org.nd4j.linalg.dataset.api.preprocessor.ImagePreProcessingScaler;
 import org.nd4j.linalg.learning.config.Nesterovs;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 import org.nd4j.linalg.primitives.Pair;
-import org.openimaj.feature.DoubleFV;
-import org.openimaj.feature.DoubleFVComparison;
-import org.openimaj.image.FImage;
-import org.openimaj.image.processing.resize.ResizeProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,54 +133,13 @@ public class Run3Failed {
                 .addLayer("predictions",
                         new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
                                 .nIn(4096).nOut(numOfLabels)
-                                .weightInit(new NormalDistribution(0,0.2*(2.0/(4096+numOfLabels))))
+                                .weightInit(new NormalDistribution(0, 0.2 * (2.0 / (4096 + numOfLabels))))
                                 .activation(Activation.SOFTMAX).build(),
                         "fc2")
                 .build();
         logger.info(vgg16Transfer.summary());
 
         return vgg16Transfer;
-    }
-
-    private ConvolutionLayer convInit(String name, int in, int out, int[] kernel, int[] stride, int[] pad, double bias) {
-        return new ConvolutionLayer.Builder(kernel, stride, pad).name(name).nIn(in).nOut(out).biasInit(bias).build();
-    }
-
-    private ConvolutionLayer conv5x5(String name, int out, int[] stride, int[] pad, double bias) {
-        return new ConvolutionLayer.Builder(new int[]{5,5}, stride, pad).name(name).nOut(out).biasInit(bias).build();
-    }
-
-    private SubsamplingLayer maxPool(String name,  int[] kernel) {
-        return new SubsamplingLayer.Builder(kernel, new int[]{2,2}).name(name).build();
-    }
-
-    private static boolean isSameImage(FImage firstImage, FImage secondImage){
-        //Determines if two images are similar by comparing their similarity score against the threshold.
-        return getSimilarityScore(firstImage, secondImage) < SIMILARITY_THRESHOLD;
-    }
-
-    private static double getSimilarityScore(FImage firstImage, FImage secondImage){
-        //Resize both images to the same size so their pixel vectors can be compared.
-        ResizeProcessor resizeProcessor = new ResizeProcessor(256,256,false);
-        resizeProcessor.processImage(firstImage);
-        resizeProcessor.processImage(secondImage);
-
-        //Create two Vector object from the image's pixel values.
-        Vector firstVector = Vector.wrap(firstImage.getDoublePixelVector());
-        Vector secondVector = Vector.wrap(secondImage.getDoublePixelVector());
-
-        //Center and normalize both vectors.
-        firstVector.applyCentering();
-        firstVector = firstVector.times(1/firstVector.norm());
-        secondVector.applyCentering();
-        secondVector = secondVector.times(1/secondVector.norm());
-
-        //Convert both to feature vectors to use their compare() method can be used.
-        DoubleFV firstVectorNormal = new DoubleFV(firstVector.unwrap());
-        DoubleFV secondVectorNormal = new DoubleFV(secondVector.unwrap());
-
-        //Return the euclidean distance between both vectors using the DoubleFX.compare() function.
-        return firstVectorNormal.compare(secondVectorNormal, DoubleFVComparison.EUCLIDEAN);
     }
 
     //A custom class which will label data according to the correct.txt file in the resources folder.
