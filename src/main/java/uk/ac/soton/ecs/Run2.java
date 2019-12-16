@@ -42,11 +42,11 @@ import java.util.*;
 
 public class Run2 {
 
-    final static int PATCH_STEP = 4;
-    final static int PATCH_DIM = 8;
-    final static int CLUSTERS = 600;
-    final static int TRAIN_SPLIT = 80;
-    final static int EVAL_SPLIT = 20;
+    private final static int PATCH_STEP = 4;
+    private final static int PATCH_DIM = 8;
+    private final static int CLUSTERS = 600;
+    private final static int TRAIN_SPLIT = 80;
+    private final static int EVAL_SPLIT = 20;
 
     public static void main(String[] args) throws IOException {
 
